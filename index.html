@@ -1,422 +1,691 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VDC Contador de Patas</title>
+
   <style>
     :root{
-      --bg1:#05070d; --bg2:#0b1222;
+      --bg1:#050b16;
+      --bg2:#071a2b;
       --card: rgba(255,255,255,.06);
       --stroke: rgba(255,255,255,.10);
-      --text:#eaf0ff; --muted: rgba(255,255,255,.70);
-      --brand:#19c37d; --warn:#fbbf24; --danger:#ef4444;
+      --text:#eaf2ff;
+      --muted: rgba(234,242,255,.70);
+      --good:#2ecc71;
+      --warn:#f1c40f;
+      --bad:#e74c3c;
+      --btn:#2a3445;
+      --btn2:#1f2735;
+      --shadow: 0 18px 60px rgba(0,0,0,.45);
+      --radius: 18px;
     }
     *{box-sizing:border-box}
+    html,body{height:100%}
     body{
-      margin:0; min-height:100vh;
+      margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
       color:var(--text);
-      background: radial-gradient(1200px 800px at 50% -10%, #12214a 0%, transparent 60%),
-                  linear-gradient(180deg, var(--bg2), var(--bg1));
-      display:flex; align-items:center; justify-content:center;
-      padding:20px;
+      background: radial-gradient(1200px 800px at 20% 10%, #0a2a49 0%, transparent 60%),
+                  radial-gradient(900px 700px at 80% 20%, #102a3a 0%, transparent 55%),
+                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      padding:22px;
     }
-    .wrap{width:min(980px, 100%); display:grid; gap:16px}
     .top{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:12px; flex-wrap:wrap;
+      display:flex;
+      align-items:center;
+      gap:14px;
+      margin-bottom:18px;
+      flex-wrap:wrap;
     }
     .badge{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:8px 12px; border-radius:999px;
-      background: rgba(25,195,125,.15);
-      border:1px solid rgba(25,195,125,.25);
-      color:#bff7de; font-weight:800; letter-spacing:.3px;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:8px 14px;
+      background: rgba(46,204,113,.12);
+      border:1px solid rgba(46,204,113,.25);
+      border-radius:999px;
+      font-weight:800;
+      letter-spacing:.3px;
     }
-    .badge .dot{width:9px;height:9px;border-radius:999px;background:var(--brand);box-shadow:0 0 14px rgba(25,195,125,.75)}
-    .brand{
-      font-size:20px; font-weight:900;
-      display:flex; align-items:center; gap:10px;
+    .dot{
+      width:10px;height:10px;border-radius:50%;
+      background:var(--good);
+      box-shadow:0 0 0 6px rgba(46,204,113,.12);
     }
-    .sub{color:var(--muted); font-weight:600; font-size:13px}
+    .titlewrap{display:flex; flex-direction:column; gap:4px}
+    h1{margin:0;font-size:28px;line-height:1.1}
+    .sub{color:var(--muted); font-weight:600}
+
     .grid{
       display:grid;
-      grid-template-columns: 1.2fr .8fr;
+      grid-template-columns: 1.35fr 1fr;
       gap:16px;
+      align-items:start;
     }
-    @media (max-width: 900px){ .grid{grid-template-columns:1fr} }
+    @media (max-width: 980px){
+      .grid{grid-template-columns: 1fr;}
+    }
+
     .card{
       background: var(--card);
-      border:1px solid var(--stroke);
-      border-radius:18px;
-      padding:18px;
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
       backdrop-filter: blur(10px);
-      box-shadow: 0 20px 60px rgba(0,0,0,.35);
+      padding:16px;
     }
-    .h1{font-size:34px; font-weight:950; margin:0}
-    .counter{
-      margin-top:10px;
-      display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+
+    .card h2{
+      margin:0 0 12px 0;
+      font-size:18px;
+      letter-spacing:.2px;
     }
-    .num{
-      font-size:88px; line-height:1;
-      font-weight:1000;
+
+    /* Conteo */
+    .countBox{
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+    .bigRow{
+      display:flex;
+      align-items:baseline;
+      gap:14px;
+    }
+    .bigNum{
+      font-size:84px;
+      line-height:1;
+      font-weight:900;
       letter-spacing:-2px;
     }
-    .unit{color:var(--muted); font-weight:800; font-size:18px}
-    .status{
-      margin-top:10px;
-      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-      color:var(--muted); font-weight:700;
+    .unit{
+      font-size:20px;
+      font-weight:800;
+      color:var(--muted);
     }
-    .pill{
+    .chips{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
       padding:6px 10px;
       border-radius:999px;
-      border:1px solid var(--stroke);
-      background: rgba(255,255,255,.04);
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      color:var(--muted);
+      font-weight:800;
       font-size:12px;
     }
-    .pill.on{border-color: rgba(25,195,125,.35); background: rgba(25,195,125,.10); color:#bff7de}
-    .pill.off{border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.10); color:#ffe9b0}
+    .chip.warn{background: rgba(241,196,15,.12); border-color: rgba(241,196,15,.25); color:#ffeaa7}
+    .chip.good{background: rgba(46,204,113,.12); border-color: rgba(46,204,113,.25); color:#c9ffe1}
 
-    .controls{display:grid; gap:10px; margin-top:14px}
-    .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
-    @media (max-width: 520px){ .row{grid-template-columns:1fr} }
+    .btnRow{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width: 520px){
+      .btnRow{grid-template-columns:1fr;}
+    }
 
     button{
       appearance:none;
-      border:none;
-      border-radius:14px;
-      padding:14px 14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      color:var(--text);
       font-weight:900;
+      letter-spacing:.3px;
+      padding:14px 14px;
+      border-radius: 14px;
       cursor:pointer;
-      color:#071014;
-      background: var(--brand);
-      transition: transform .06s ease, opacity .2s ease;
+      transition: transform .04s ease, filter .15s ease, opacity .15s ease;
+      user-select:none;
     }
-    button:active{transform: scale(.99)}
-    button.secondary{background: rgba(255,255,255,.08); color:var(--text); border:1px solid var(--stroke)}
-    button.warn{background: var(--warn); color:#1b1403}
-    button.danger{background: rgba(239,68,68,.90); color:#fff}
-    button:disabled{opacity:.55; cursor:not-allowed}
+    button:hover{filter:brightness(1.06)}
+    button:active{transform: translateY(1px)}
+    button:disabled{opacity:.45; cursor:not-allowed}
 
-    .log h3{margin:0 0 10px; font-size:14px; color:var(--muted); font-weight:900; letter-spacing:.2px}
-    .list{
-      max-height: 320px;
-      overflow:auto;
-      display:grid; gap:8px;
-      padding-right:6px;
+    .btnGreen{
+      background: linear-gradient(180deg, rgba(46,204,113,.95), rgba(46,204,113,.65));
+      border-color: rgba(46,204,113,.35);
+      color:#072113;
     }
-    .item{
-      display:flex; justify-content:space-between; gap:10px;
-      padding:10px 12px;
-      border:1px solid var(--stroke);
-      border-radius:12px;
-      background: rgba(255,255,255,.03);
-      font-weight:800;
+    .btnGold{
+      background: linear-gradient(180deg, rgba(241,196,15,.95), rgba(241,196,15,.65));
+      border-color: rgba(241,196,15,.35);
+      color:#241c07;
     }
-    .item small{color:var(--muted); font-weight:700}
-    .footer{
-      display:flex; gap:10px; flex-wrap:wrap;
-      margin-top:10px;
-      color:var(--muted); font-weight:700; font-size:12px
+    .btnRed{
+      background: linear-gradient(180deg, rgba(231,76,60,.95), rgba(231,76,60,.65));
+      border-color: rgba(231,76,60,.35);
+      color:#2a0b09;
+    }
+    .btnDark{background: linear-gradient(180deg, rgba(42,52,69,.9), rgba(31,39,53,.9));}
+
+    .tip{
+      color: var(--muted);
+      font-weight:700;
+      font-size:12px;
+      line-height:1.4;
+    }
+
+    /* Panel derecho */
+    .right{
+      display:grid;
+      gap:16px;
+    }
+
+    label{
+      display:block;
+      font-weight:900;
+      color:var(--muted);
+      font-size:12px;
+      margin-bottom:6px;
+      letter-spacing:.2px;
     }
     input{
       width:100%;
-      border-radius:14px;
-      border:1px solid var(--stroke);
-      background: rgba(255,255,255,.05);
-      color: var(--text);
       padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      color:var(--text);
       font-weight:800;
       outline:none;
     }
-    label{display:block; font-size:12px; color:var(--muted); font-weight:900; margin-bottom:6px}
+    input::placeholder{color: rgba(234,242,255,.45)}
+    .saveRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color:var(--muted);
+      font-weight:900;
+      font-size:12px;
+    }
+
+    /* Bitácora */
+    .logBox{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .logHead{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-weight:900;
+      font-size:12px;
+    }
+    .logList{
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      padding:10px;
+      min-height:120px;
+      max-height:260px;
+      overflow:auto;
+    }
+    .logItem{
+      padding:10px 10px;
+      border-radius:12px;
+      background: rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.08);
+      margin-bottom:8px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      font-weight:800;
+      color:var(--text);
+    }
+    .logItem small{color:var(--muted); font-weight:900}
+    .logEmpty{
+      color:rgba(234,242,255,.55);
+      font-weight:900;
+      padding:10px;
+    }
+
+    /* Cámara */
+    .videoWrap{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    video{
+      width:100%;
+      max-width:520px;
+      border-radius:14px;
+      border:1px solid rgba(46,204,113,.25);
+      background:#000;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .camBtns{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
-    <div class="top">
-      <div>
-        <div class="badge"><span class="dot"></span> ONLINE</div>
-        <div class="brand" style="margin-top:8px;">VDC Contador de Patas</div>
-        <div class="sub">MVP manual con guardado automático (primer paso del contador automático).</div>
-      </div>
+  <div class="top">
+    <div class="badge"><span class="dot"></span> ONLINE</div>
+    <div class="titlewrap">
+      <h1>VDC Contador de Patas</h1>
+      <div class="sub">MVP manual con guardado automático (primer paso del contador automático).</div>
+    </div>
+  </div>
 
-      <div class="card" style="padding:14px 16px; border-radius:16px;">
-        <div style="display:grid; gap:8px; min-width: 280px;">
-          <div>
-            <label for="sessionName">Nombre de sesión (opcional)</label>
-            <input id="sessionName" placeholder="Ej. Camión 7:00 AM - Martes" />
-          </div>
-          <div class="footer">
-            <span class="pill" id="savedPill">Guardado: listo</span>
-            <span class="pill" id="timePill">—</span>
-          </div>
+  <div class="grid">
+    <!-- IZQUIERDA: CONTEO -->
+    <div class="card">
+      <div class="countBox">
+        <h2>Conteo</h2>
+
+        <div class="bigRow">
+          <div class="bigNum" id="count">0</div>
+          <div class="unit">patas</div>
+        </div>
+
+        <div class="chips">
+          <div class="chip warn" id="statusChip">PAUSADO</div>
+          <div class="chip" id="sessionChip">Sesión: (sin nombre)</div>
+        </div>
+
+        <div class="btnRow">
+          <button class="btnGreen" id="btnStart">INICIAR</button>
+          <button class="btnDark" id="btnPause" disabled>PAUSAR</button>
+
+          <button class="btnGold" id="btnPlus" disabled>+1 PATA</button>
+          <button class="btnDark" id="btnUndo" disabled>DESHACER</button>
+
+          <button class="btnRed" id="btnReset">REINICIAR A CERO</button>
+          <button class="btnDark" id="btnExport">EXPORTAR (CSV)</button>
+        </div>
+
+        <div class="tip">
+          Tip: el conteo se guarda automáticamente en este equipo (local).
+          Luego lo conectamos al iPhone/cámara.
         </div>
       </div>
     </div>
 
-    <div class="grid">
+    <!-- DERECHA -->
+    <div class="right">
+      <!-- Sesión -->
       <div class="card">
-        <h1 class="h1">Conteo</h1>
+        <h2>Nombre de sesión (opcional)</h2>
+        <label for="sessionName">Ej. Camión 7:00 AM - Martes</label>
+        <input id="sessionName" placeholder="Ej. Camión 7:00 AM - Martes" />
 
-        <div class="counter">
-          <div class="num" id="count">0</div>
-          <div class="unit">patas</div>
-        </div>
-
-        <div class="status">
-          <span class="pill off" id="statePill">PAUSADO</span>
-          <span class="pill" id="sessionPill">Sesión: (sin nombre)</span>
-        </div>
-
-        <div class="controls">
-          <div class="row">
-            <button id="startBtn">INICIAR</button>
-            <button id="pauseBtn" class="secondary" disabled>PAUSAR</button>
-          </div>
-          <div class="row">
-            <button id="plusBtn" class="warn" disabled>+1 PATA</button>
-            <button id="undoBtn" class="secondary" disabled>DESHACER</button>
-          </div>
-          <div class="row">
-            <button id="resetBtn" class="danger">REINICIAR A CERO</button>
-            <button id="exportBtn" class="secondary">EXPORTAR (CSV)</button>
-          </div>
-        </div>
-
-        <div class="footer">
-          Tip: el conteo se guarda solo en este equipo (local). Luego lo conectamos al iPhone/cámara.
+        <div class="saveRow">
+          <div class="pill" id="savePill">Guardado: listo</div>
+          <div class="pill" id="lastSavedPill">Último guardado: —</div>
         </div>
       </div>
 
-      <div class="card log">
-        <h3>Bitácora (últimos eventos)</h3>
-        <div class="list" id="logList"></div>
-        <div class="footer">
-          <span>Se guarda automáticamente.</span>
-          <span>Hora local: <b id="clock">—</b></span>
+      <!-- Bitácora -->
+      <div class="card">
+        <h2>Bitácora (últimos eventos)</h2>
+
+        <div class="logHead">
+          <div><span id="logStatus">Sin eventos</span></div>
+          <div>Empieza con <b>INICIAR</b></div>
+        </div>
+
+        <div class="logBox">
+          <div class="logList" id="logList">
+            <div class="logEmpty">Sin eventos</div>
+          </div>
+          <div class="logHead">
+            <div>Se guarda automáticamente.</div>
+            <div>Hora local: <span id="clock">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CÁMARA (OPCIÓN B - PASO B1) -->
+      <div class="card">
+        <h2>📷 Modo Cámara (Paso B1)</h2>
+        <div class="videoWrap">
+          <video id="video" autoplay playsinline muted></video>
+
+          <div class="camBtns">
+            <button class="btnGreen" id="btnCamOn">ACTIVAR CÁMARA</button>
+            <button class="btnDark" id="btnCamOff" disabled>APAGAR CÁMARA</button>
+          </div>
+
+          <div class="tip">
+            iPhone: abre esta página en Safari → “ACTIVAR CÁMARA”.
+            Si no te pide permisos: Ajustes → Safari → Cámara → Permitir.
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    // ========= Estado =========
-    const STORAGE_KEY = "vdc_patas_mvp_v1";
-
-    const $ = (id) => document.getElementById(id);
-
-    const ui = {
-      count: $("count"),
-      statePill: $("statePill"),
-      sessionPill: $("sessionPill"),
-      savedPill: $("savedPill"),
-      timePill: $("timePill"),
-      clock: $("clock"),
-      sessionName: $("sessionName"),
-      logList: $("logList"),
-      startBtn: $("startBtn"),
-      pauseBtn: $("pauseBtn"),
-      plusBtn: $("plusBtn"),
-      undoBtn: $("undoBtn"),
-      resetBtn: $("resetBtn"),
-      exportBtn: $("exportBtn"),
-    };
+    /***********************
+     * Estado + Persistencia
+     ***********************/
+    const STORAGE_KEY = "vdc_patas_state_v1";
 
     const state = {
-      running: false,
       count: 0,
+      running: false,
       sessionName: "",
-      history: [], // {ts, type, delta, countAfter}
-      lastSavedAt: null
+      lastSavedAt: null,
+      events: [] // {ts, type, detail, countAfter}
     };
 
-    // ========= Utilidades =========
-    const pad2 = (n) => String(n).padStart(2, "0");
-    function fmtDate(ts){
-      const d = new Date(ts);
-      return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    function nowISO(){ return new Date().toISOString(); }
+    function fmtTime(ts){
+      try{
+        const d = new Date(ts);
+        return d.toLocaleString(undefined, { hour12: false });
+      }catch{ return ts; }
     }
 
-    function addEvent(type, delta){
-      const ts = Date.now();
-      state.history.unshift({ ts, type, delta, countAfter: state.count });
-      state.history = state.history.slice(0, 50);
-      save();
-      render();
-    }
-
-    function save(){
-      state.lastSavedAt = Date.now();
+    function saveState(){
+      state.lastSavedAt = nowISO();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      ui.savedPill.textContent = "Guardado: OK";
-      setTimeout(() => { ui.savedPill.textContent = "Guardado: listo"; }, 700);
+      renderSave();
     }
 
-    function load(){
+    function loadState(){
       const raw = localStorage.getItem(STORAGE_KEY);
       if(!raw) return;
       try{
-        const data = JSON.parse(raw);
-        Object.assign(state, data);
+        const parsed = JSON.parse(raw);
+        if(typeof parsed.count === "number") state.count = parsed.count;
+        if(typeof parsed.running === "boolean") state.running = parsed.running;
+        if(typeof parsed.sessionName === "string") state.sessionName = parsed.sessionName;
+        if(parsed.lastSavedAt) state.lastSavedAt = parsed.lastSavedAt;
+        if(Array.isArray(parsed.events)) state.events = parsed.events.slice(-200);
       }catch(e){
-        console.warn("No se pudo cargar estado:", e);
+        console.warn("No se pudo cargar state", e);
       }
     }
 
-    function setRunning(on){
-      state.running = on;
-
-      ui.startBtn.disabled = on;
-      ui.pauseBtn.disabled = !on;
-      ui.plusBtn.disabled  = !on;
-      ui.undoBtn.disabled  = state.history.length === 0;
-
-      ui.statePill.textContent = on ? "CONTANDO" : "PAUSADO";
-      ui.statePill.className = "pill " + (on ? "on" : "off");
-      save();
-      render();
+    function pushEvent(type, detail=""){
+      const ev = { ts: nowISO(), type, detail, countAfter: state.count };
+      state.events.unshift(ev);
+      state.events = state.events.slice(0, 100); // últimos 100
+      saveState();
+      renderLog();
     }
 
+    /***********************
+     * UI Elements
+     ***********************/
+    const elCount = document.getElementById("count");
+    const elStatusChip = document.getElementById("statusChip");
+    const elSessionChip = document.getElementById("sessionChip");
+
+    const btnStart = document.getElementById("btnStart");
+    const btnPause = document.getElementById("btnPause");
+    const btnPlus  = document.getElementById("btnPlus");
+    const btnUndo  = document.getElementById("btnUndo");
+    const btnReset = document.getElementById("btnReset");
+    const btnExport= document.getElementById("btnExport");
+
+    const inputSession = document.getElementById("sessionName");
+    const savePill = document.getElementById("savePill");
+    const lastSavedPill = document.getElementById("lastSavedPill");
+
+    const logList = document.getElementById("logList");
+    const logStatus = document.getElementById("logStatus");
+    const clock = document.getElementById("clock");
+
+    /***********************
+     * Render
+     ***********************/
     function render(){
-      ui.count.textContent = state.count;
+      elCount.textContent = String(state.count);
 
-      const sName = (state.sessionName || "").trim();
-      ui.sessionPill.textContent = "Sesión: " + (sName ? sName : "(sin nombre)");
-      ui.sessionName.value = state.sessionName || "";
-
-      ui.undoBtn.disabled = state.history.length === 0;
-
-      if(state.lastSavedAt){
-        ui.timePill.textContent = "Último guardado: " + fmtDate(state.lastSavedAt);
-      } else {
-        ui.timePill.textContent = "Último guardado: —";
+      if(state.running){
+        elStatusChip.textContent = "EN CONTEO";
+        elStatusChip.classList.remove("warn");
+        elStatusChip.classList.add("good");
+        btnStart.disabled = true;
+        btnPause.disabled = false;
+        btnPlus.disabled  = false;
+      }else{
+        elStatusChip.textContent = "PAUSADO";
+        elStatusChip.classList.remove("good");
+        elStatusChip.classList.add("warn");
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+        btnPlus.disabled  = true;
       }
 
-      // Bitácora
-      ui.logList.innerHTML = "";
-      if(state.history.length === 0){
-        const empty = document.createElement("div");
-        empty.className = "item";
-        empty.innerHTML = `<span>Sin eventos</span><small>Empieza con INICIAR</small>`;
-        ui.logList.appendChild(empty);
-      } else {
-        for(const ev of state.history){
-          const row = document.createElement("div");
-          row.className = "item";
-          const deltaTxt = ev.delta > 0 ? `+${ev.delta}` : `${ev.delta}`;
-          row.innerHTML = `
-            <span>${ev.type} <small>(${deltaTxt})</small></span>
-            <small>${fmtDate(ev.ts)} · total ${ev.countAfter}</small>
-          `;
-          ui.logList.appendChild(row);
-        }
+      btnUndo.disabled = state.events.filter(e => e.type==="PLUS").length === 0;
+
+      const name = (state.sessionName || "").trim();
+      elSessionChip.textContent = name ? `Sesión: ${name}` : "Sesión: (sin nombre)";
+      inputSession.value = state.sessionName || "";
+
+      renderSave();
+      renderLog();
+    }
+
+    function renderSave(){
+      savePill.textContent = "Guardado: listo";
+      lastSavedPill.textContent = state.lastSavedAt
+        ? ("Último guardado: " + fmtTime(state.lastSavedAt))
+        : "Último guardado: —";
+    }
+
+    function renderLog(){
+      logList.innerHTML = "";
+      if(!state.events.length){
+        logList.innerHTML = `<div class="logEmpty">Sin eventos</div>`;
+        logStatus.textContent = "Sin eventos";
+        return;
+      }
+      logStatus.textContent = `${state.events.length} evento(s)`;
+      for(const ev of state.events.slice(0, 12)){
+        const left = `<div>
+            <div>${ev.type}${ev.detail ? " — " + ev.detail : ""}</div>
+            <small>${fmtTime(ev.ts)}</small>
+          </div>`;
+        const right = `<div style="text-align:right">
+            <div><small>Conteo</small></div>
+            <div style="font-weight:900">${ev.countAfter}</div>
+          </div>`;
+        const item = document.createElement("div");
+        item.className = "logItem";
+        item.innerHTML = left + right;
+        logList.appendChild(item);
       }
     }
 
-    // ========= Acciones =========
-    function plusOne(){
+    /***********************
+     * Botones Conteo
+     ***********************/
+    btnStart.addEventListener("click", () => {
+      state.running = true;
+      pushEvent("INICIAR");
+      render();
+    });
+
+    btnPause.addEventListener("click", () => {
+      state.running = false;
+      pushEvent("PAUSAR");
+      render();
+    });
+
+    btnPlus.addEventListener("click", () => {
       if(!state.running) return;
       state.count += 1;
-      addEvent("SUMA", +1);
-    }
-
-    function undo(){
-      if(state.history.length === 0) return;
-
-      // Revertimos el último evento aplicando delta inversa si era "SUMA"
-      const last = state.history.shift();
-
-      // Si quieres hacer más tipos en el futuro, aquí se amplía.
-      if(last.type === "SUMA"){
-        state.count = Math.max(0, state.count - 1);
-      }
-
-      addEvent("DESHACER", 0); // deja rastro de que se deshizo
+      pushEvent("PLUS", "+1 pata");
       render();
-    }
+    });
 
-    function resetAll(){
-      const ok = confirm("¿Seguro que quieres reiniciar a cero? (No se puede deshacer)");
+    btnUndo.addEventListener("click", () => {
+      // deshacer último PLUS
+      const idx = state.events.findIndex(e => e.type === "PLUS");
+      if(idx === -1) return;
+
+      // Recalcular count desde el historial (simple y robusto)
+      // Tomamos el count actual y lo restamos 1 por seguridad.
+      state.count = Math.max(0, state.count - 1);
+      state.events.splice(idx, 1);
+      state.events.unshift({ ts: nowISO(), type:"DESHACER", detail:"-1 pata", countAfter: state.count });
+      saveState();
+      render();
+    });
+
+    btnReset.addEventListener("click", () => {
+      const ok = confirm("¿Seguro que deseas reiniciar a cero? (Esto NO borra la bitácora)");
       if(!ok) return;
-
-      state.running = false;
       state.count = 0;
-      state.history = [];
-      addEvent("REINICIO", 0);
-      setRunning(false);
-    }
+      pushEvent("REINICIAR", "conteo=0");
+      render();
+    });
 
-    function exportCSV(){
-      // CSV simple: fecha, tipo, delta, total
-      const rows = [["fecha", "tipo", "delta", "total"]];
-      // history está al revés (último arriba). Exportamos cronológico.
-      const chronological = [...state.history].reverse();
-      for(const ev of chronological){
-        rows.push([fmtDate(ev.ts), ev.type, ev.delta, ev.countAfter]);
+    btnExport.addEventListener("click", () => {
+      const rows = [];
+      rows.push(["timestamp","type","detail","countAfter","sessionName"].join(","));
+      for(const ev of [...state.events].reverse()){
+        const row = [
+          safeCSV(ev.ts),
+          safeCSV(ev.type),
+          safeCSV(ev.detail || ""),
+          safeCSV(String(ev.countAfter)),
+          safeCSV(state.sessionName || "")
+        ].join(",");
+        rows.push(row);
       }
-      const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
-      const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
-      const url = URL.createObjectURL(blob);
+      const csv = rows.join("\n");
+      downloadFile(csv, buildFileName());
+      pushEvent("EXPORTAR", "CSV");
+      render();
+    });
 
+    function safeCSV(v){
+      const s = String(v ?? "");
+      if(/[",\n]/.test(s)) return `"${s.replaceAll('"','""')}"`;
+      return s;
+    }
+    function buildFileName(){
+      const name = (state.sessionName || "sin_nombre")
+        .trim()
+        .replaceAll(" ","_")
+        .replace(/[^\w\-]/g,"");
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,"0");
+      const day = String(d.getDate()).padStart(2,"0");
+      const hh = String(d.getHours()).padStart(2,"0");
+      const mm = String(d.getMinutes()).padStart(2,"0");
+      return `vdc_patas_${name}_${y}-${m}-${day}_${hh}${mm}.csv`;
+    }
+    function downloadFile(text, filename){
+      const blob = new Blob([text], {type:"text/csv;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `vdc_patas_${new Date().toISOString().slice(0,10)}.csv`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
     }
 
-    // ========= Eventos UI =========
-    ui.startBtn.addEventListener("click", () => {
-      addEvent("INICIO", 0);
-      setRunning(true);
+    /***********************
+     * Sesión + Autosave
+     ***********************/
+    let sessionDebounce = null;
+    inputSession.addEventListener("input", () => {
+      const v = inputSession.value || "";
+      state.sessionName = v;
+      if(sessionDebounce) clearTimeout(sessionDebounce);
+      sessionDebounce = setTimeout(() => {
+        saveState();
+        render();
+      }, 250);
     });
 
-    ui.pauseBtn.addEventListener("click", () => {
-      addEvent("PAUSA", 0);
-      setRunning(false);
-    });
-
-    ui.plusBtn.addEventListener("click", plusOne);
-
-    ui.undoBtn.addEventListener("click", undo);
-
-    ui.resetBtn.addEventListener("click", resetAll);
-
-    ui.exportBtn.addEventListener("click", exportCSV);
-
-    ui.sessionName.addEventListener("input", (e) => {
-      state.sessionName = e.target.value;
-      save();
-      render();
-    });
-
-    // Atajo teclado: espacio = +1 cuando está corriendo
-    window.addEventListener("keydown", (e) => {
-      if(e.code === "Space"){
-        e.preventDefault();
-        plusOne();
-      }
-    });
-
-    // Reloj
-    setInterval(() => {
+    /***********************
+     * Reloj
+     ***********************/
+    function tickClock(){
       const d = new Date();
-      ui.clock.textContent = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-    }, 250);
+      clock.textContent = d.toLocaleTimeString(undefined, { hour12:false });
+    }
+    setInterval(tickClock, 1000);
+    tickClock();
 
-    // ========= Init =========
-    load();
+    /***********************
+     * CÁMARA (Paso B1)
+     ***********************/
+    const video = document.getElementById("video");
+    const btnCamOn  = document.getElementById("btnCamOn");
+    const btnCamOff = document.getElementById("btnCamOff");
+    let camStream = null;
+
+    async function startCamera(){
+      try{
+        camStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        });
+        video.srcObject = camStream;
+        btnCamOn.disabled = true;
+        btnCamOff.disabled = false;
+        pushEvent("CAMARA_ON");
+      }catch(err){
+        console.error(err);
+        alert("No se pudo acceder a la cámara. Revisa permisos en Safari/Chrome.");
+      }
+    }
+
+    function stopCamera(){
+      try{
+        if(camStream){
+          camStream.getTracks().forEach(t => t.stop());
+          camStream = null;
+        }
+        video.srcObject = null;
+        btnCamOn.disabled = false;
+        btnCamOff.disabled = true;
+        pushEvent("CAMARA_OFF");
+      }catch(err){
+        console.error(err);
+      }
+    }
+
+    btnCamOn.addEventListener("click", startCamera);
+    btnCamOff.addEventListener("click", stopCamera);
+
+    /***********************
+     * Init
+     ***********************/
+    loadState();
     render();
-    // Respeta el estado de running guardado
-    setRunning(!!state.running);
+
+    // Guardado de seguridad cada 15s (por si acaso)
+    setInterval(() => {
+      saveState();
+    }, 15000);
   </script>
 </body>
 </html>
+
 
