@@ -1,48 +1,422 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VDC Contador de Patas</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto;
-      background: #0b1220;
-      color: #e5e7eb;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
+    :root{
+      --bg1:#05070d; --bg2:#0b1222;
+      --card: rgba(255,255,255,.06);
+      --stroke: rgba(255,255,255,.10);
+      --text:#eaf0ff; --muted: rgba(255,255,255,.70);
+      --brand:#19c37d; --warn:#fbbf24; --danger:#ef4444;
     }
-    .card {
-      background: #111827;
-      border: 1px solid #243042;
-      border-radius: 16px;
-      padding: 32px;
-      max-width: 420px;
-      text-align: center;
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      color:var(--text);
+      background: radial-gradient(1200px 800px at 50% -10%, #12214a 0%, transparent 60%),
+                  linear-gradient(180deg, var(--bg2), var(--bg1));
+      display:flex; align-items:center; justify-content:center;
+      padding:20px;
     }
-    h1 {
-      margin-top: 0;
+    .wrap{width:min(980px, 100%); display:grid; gap:16px}
+    .top{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px; flex-wrap:wrap;
     }
-    .ok {
-      display: inline-block;
-      margin-bottom: 12px;
-      padding: 6px 12px;
-      background: #064e3b;
-      color: #34d399;
-      border-radius: 999px;
-      font-weight: bold;
+    .badge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 12px; border-radius:999px;
+      background: rgba(25,195,125,.15);
+      border:1px solid rgba(25,195,125,.25);
+      color:#bff7de; font-weight:800; letter-spacing:.3px;
     }
+    .badge .dot{width:9px;height:9px;border-radius:999px;background:var(--brand);box-shadow:0 0 14px rgba(25,195,125,.75)}
+    .brand{
+      font-size:20px; font-weight:900;
+      display:flex; align-items:center; gap:10px;
+    }
+    .sub{color:var(--muted); font-weight:600; font-size:13px}
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:16px;
+    }
+    @media (max-width: 900px){ .grid{grid-template-columns:1fr} }
+    .card{
+      background: var(--card);
+      border:1px solid var(--stroke);
+      border-radius:18px;
+      padding:18px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    }
+    .h1{font-size:34px; font-weight:950; margin:0}
+    .counter{
+      margin-top:10px;
+      display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+    }
+    .num{
+      font-size:88px; line-height:1;
+      font-weight:1000;
+      letter-spacing:-2px;
+    }
+    .unit{color:var(--muted); font-weight:800; font-size:18px}
+    .status{
+      margin-top:10px;
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      color:var(--muted); font-weight:700;
+    }
+    .pill{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.04);
+      font-size:12px;
+    }
+    .pill.on{border-color: rgba(25,195,125,.35); background: rgba(25,195,125,.10); color:#bff7de}
+    .pill.off{border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.10); color:#ffe9b0}
+
+    .controls{display:grid; gap:10px; margin-top:14px}
+    .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
+    @media (max-width: 520px){ .row{grid-template-columns:1fr} }
+
+    button{
+      appearance:none;
+      border:none;
+      border-radius:14px;
+      padding:14px 14px;
+      font-weight:900;
+      cursor:pointer;
+      color:#071014;
+      background: var(--brand);
+      transition: transform .06s ease, opacity .2s ease;
+    }
+    button:active{transform: scale(.99)}
+    button.secondary{background: rgba(255,255,255,.08); color:var(--text); border:1px solid var(--stroke)}
+    button.warn{background: var(--warn); color:#1b1403}
+    button.danger{background: rgba(239,68,68,.90); color:#fff}
+    button:disabled{opacity:.55; cursor:not-allowed}
+
+    .log h3{margin:0 0 10px; font-size:14px; color:var(--muted); font-weight:900; letter-spacing:.2px}
+    .list{
+      max-height: 320px;
+      overflow:auto;
+      display:grid; gap:8px;
+      padding-right:6px;
+    }
+    .item{
+      display:flex; justify-content:space-between; gap:10px;
+      padding:10px 12px;
+      border:1px solid var(--stroke);
+      border-radius:12px;
+      background: rgba(255,255,255,.03);
+      font-weight:800;
+    }
+    .item small{color:var(--muted); font-weight:700}
+    .footer{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:10px;
+      color:var(--muted); font-weight:700; font-size:12px
+    }
+    input{
+      width:100%;
+      border-radius:14px;
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      padding:12px 12px;
+      font-weight:800;
+      outline:none;
+    }
+    label{display:block; font-size:12px; color:var(--muted); font-weight:900; margin-bottom:6px}
   </style>
 </head>
+
 <body>
-  <div class="card">
-    <div class="ok">ONLINE</div>
-    <h1>VDC Contador de Patas</h1>
-    <p>GitHub Pages está funcionando correctamente.</p>
-    <p>Este será el MVP del contador automático.</p>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="badge"><span class="dot"></span> ONLINE</div>
+        <div class="brand" style="margin-top:8px;">VDC Contador de Patas</div>
+        <div class="sub">MVP manual con guardado automático (primer paso del contador automático).</div>
+      </div>
+
+      <div class="card" style="padding:14px 16px; border-radius:16px;">
+        <div style="display:grid; gap:8px; min-width: 280px;">
+          <div>
+            <label for="sessionName">Nombre de sesión (opcional)</label>
+            <input id="sessionName" placeholder="Ej. Camión 7:00 AM - Martes" />
+          </div>
+          <div class="footer">
+            <span class="pill" id="savedPill">Guardado: listo</span>
+            <span class="pill" id="timePill">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h1 class="h1">Conteo</h1>
+
+        <div class="counter">
+          <div class="num" id="count">0</div>
+          <div class="unit">patas</div>
+        </div>
+
+        <div class="status">
+          <span class="pill off" id="statePill">PAUSADO</span>
+          <span class="pill" id="sessionPill">Sesión: (sin nombre)</span>
+        </div>
+
+        <div class="controls">
+          <div class="row">
+            <button id="startBtn">INICIAR</button>
+            <button id="pauseBtn" class="secondary" disabled>PAUSAR</button>
+          </div>
+          <div class="row">
+            <button id="plusBtn" class="warn" disabled>+1 PATA</button>
+            <button id="undoBtn" class="secondary" disabled>DESHACER</button>
+          </div>
+          <div class="row">
+            <button id="resetBtn" class="danger">REINICIAR A CERO</button>
+            <button id="exportBtn" class="secondary">EXPORTAR (CSV)</button>
+          </div>
+        </div>
+
+        <div class="footer">
+          Tip: el conteo se guarda solo en este equipo (local). Luego lo conectamos al iPhone/cámara.
+        </div>
+      </div>
+
+      <div class="card log">
+        <h3>Bitácora (últimos eventos)</h3>
+        <div class="list" id="logList"></div>
+        <div class="footer">
+          <span>Se guarda automáticamente.</span>
+          <span>Hora local: <b id="clock">—</b></span>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <script>
+    // ========= Estado =========
+    const STORAGE_KEY = "vdc_patas_mvp_v1";
+
+    const $ = (id) => document.getElementById(id);
+
+    const ui = {
+      count: $("count"),
+      statePill: $("statePill"),
+      sessionPill: $("sessionPill"),
+      savedPill: $("savedPill"),
+      timePill: $("timePill"),
+      clock: $("clock"),
+      sessionName: $("sessionName"),
+      logList: $("logList"),
+      startBtn: $("startBtn"),
+      pauseBtn: $("pauseBtn"),
+      plusBtn: $("plusBtn"),
+      undoBtn: $("undoBtn"),
+      resetBtn: $("resetBtn"),
+      exportBtn: $("exportBtn"),
+    };
+
+    const state = {
+      running: false,
+      count: 0,
+      sessionName: "",
+      history: [], // {ts, type, delta, countAfter}
+      lastSavedAt: null
+    };
+
+    // ========= Utilidades =========
+    const pad2 = (n) => String(n).padStart(2, "0");
+    function fmtDate(ts){
+      const d = new Date(ts);
+      return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    }
+
+    function addEvent(type, delta){
+      const ts = Date.now();
+      state.history.unshift({ ts, type, delta, countAfter: state.count });
+      state.history = state.history.slice(0, 50);
+      save();
+      render();
+    }
+
+    function save(){
+      state.lastSavedAt = Date.now();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      ui.savedPill.textContent = "Guardado: OK";
+      setTimeout(() => { ui.savedPill.textContent = "Guardado: listo"; }, 700);
+    }
+
+    function load(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      try{
+        const data = JSON.parse(raw);
+        Object.assign(state, data);
+      }catch(e){
+        console.warn("No se pudo cargar estado:", e);
+      }
+    }
+
+    function setRunning(on){
+      state.running = on;
+
+      ui.startBtn.disabled = on;
+      ui.pauseBtn.disabled = !on;
+      ui.plusBtn.disabled  = !on;
+      ui.undoBtn.disabled  = state.history.length === 0;
+
+      ui.statePill.textContent = on ? "CONTANDO" : "PAUSADO";
+      ui.statePill.className = "pill " + (on ? "on" : "off");
+      save();
+      render();
+    }
+
+    function render(){
+      ui.count.textContent = state.count;
+
+      const sName = (state.sessionName || "").trim();
+      ui.sessionPill.textContent = "Sesión: " + (sName ? sName : "(sin nombre)");
+      ui.sessionName.value = state.sessionName || "";
+
+      ui.undoBtn.disabled = state.history.length === 0;
+
+      if(state.lastSavedAt){
+        ui.timePill.textContent = "Último guardado: " + fmtDate(state.lastSavedAt);
+      } else {
+        ui.timePill.textContent = "Último guardado: —";
+      }
+
+      // Bitácora
+      ui.logList.innerHTML = "";
+      if(state.history.length === 0){
+        const empty = document.createElement("div");
+        empty.className = "item";
+        empty.innerHTML = `<span>Sin eventos</span><small>Empieza con INICIAR</small>`;
+        ui.logList.appendChild(empty);
+      } else {
+        for(const ev of state.history){
+          const row = document.createElement("div");
+          row.className = "item";
+          const deltaTxt = ev.delta > 0 ? `+${ev.delta}` : `${ev.delta}`;
+          row.innerHTML = `
+            <span>${ev.type} <small>(${deltaTxt})</small></span>
+            <small>${fmtDate(ev.ts)} · total ${ev.countAfter}</small>
+          `;
+          ui.logList.appendChild(row);
+        }
+      }
+    }
+
+    // ========= Acciones =========
+    function plusOne(){
+      if(!state.running) return;
+      state.count += 1;
+      addEvent("SUMA", +1);
+    }
+
+    function undo(){
+      if(state.history.length === 0) return;
+
+      // Revertimos el último evento aplicando delta inversa si era "SUMA"
+      const last = state.history.shift();
+
+      // Si quieres hacer más tipos en el futuro, aquí se amplía.
+      if(last.type === "SUMA"){
+        state.count = Math.max(0, state.count - 1);
+      }
+
+      addEvent("DESHACER", 0); // deja rastro de que se deshizo
+      render();
+    }
+
+    function resetAll(){
+      const ok = confirm("¿Seguro que quieres reiniciar a cero? (No se puede deshacer)");
+      if(!ok) return;
+
+      state.running = false;
+      state.count = 0;
+      state.history = [];
+      addEvent("REINICIO", 0);
+      setRunning(false);
+    }
+
+    function exportCSV(){
+      // CSV simple: fecha, tipo, delta, total
+      const rows = [["fecha", "tipo", "delta", "total"]];
+      // history está al revés (último arriba). Exportamos cronológico.
+      const chronological = [...state.history].reverse();
+      for(const ev of chronological){
+        rows.push([fmtDate(ev.ts), ev.type, ev.delta, ev.countAfter]);
+      }
+      const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vdc_patas_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    // ========= Eventos UI =========
+    ui.startBtn.addEventListener("click", () => {
+      addEvent("INICIO", 0);
+      setRunning(true);
+    });
+
+    ui.pauseBtn.addEventListener("click", () => {
+      addEvent("PAUSA", 0);
+      setRunning(false);
+    });
+
+    ui.plusBtn.addEventListener("click", plusOne);
+
+    ui.undoBtn.addEventListener("click", undo);
+
+    ui.resetBtn.addEventListener("click", resetAll);
+
+    ui.exportBtn.addEventListener("click", exportCSV);
+
+    ui.sessionName.addEventListener("input", (e) => {
+      state.sessionName = e.target.value;
+      save();
+      render();
+    });
+
+    // Atajo teclado: espacio = +1 cuando está corriendo
+    window.addEventListener("keydown", (e) => {
+      if(e.code === "Space"){
+        e.preventDefault();
+        plusOne();
+      }
+    });
+
+    // Reloj
+    setInterval(() => {
+      const d = new Date();
+      ui.clock.textContent = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    }, 250);
+
+    // ========= Init =========
+    load();
+    render();
+    // Respeta el estado de running guardado
+    setRunning(!!state.running);
+  </script>
 </body>
 </html>
+
