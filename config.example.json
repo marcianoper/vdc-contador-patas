@@ -1,0 +1,7 @@
+{
+  "stream_url": "PEGA_AQUI_LA_URL_DEL_IPHONE",
+  "roi": { "x": 0, "y": 0, "w": 910, "h": 512 },
+  "line_y": 320,
+  "min_area": 2500,
+  "cooldown_sec": 3.0
+}
