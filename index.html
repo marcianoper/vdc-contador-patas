@@ -1,551 +1,859 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VDC Contador de Patas — Paso B2</title>
+  <title>VDC Contador de Patas — B2/B3</title>
   <style>
     :root{
-      --bg:#07111f; --card:rgba(255,255,255,.07); --card2:rgba(255,255,255,.05);
-      --txt:#e9eef7; --mut:#a9b4c7; --brand:#35c36b; --warn:#d7b24a; --danger:#d45a5a;
-      --stroke:rgba(255,255,255,.12);
+      --bg1:#08101f; --bg2:#060b16;
+      --card: rgba(255,255,255,.06);
+      --stroke: rgba(255,255,255,.10);
+      --text:#eaf0ff; --muted: rgba(234,240,255,.65);
+      --green:#32d07f; --amber:#caa24a; --red:#e05555; --blue:#4aa3ff;
     }
     *{box-sizing:border-box}
-    body{margin:0;background:radial-gradient(900px 500px at 20% 10%, rgba(74,125,255,.18), transparent 60%),
-                  radial-gradient(900px 500px at 80% 30%, rgba(53,195,107,.16), transparent 60%),
-                  var(--bg);
-         color:var(--txt); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto;
-         padding:18px;}
-    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}
-    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(53,195,107,.14);border:1px solid rgba(53,195,107,.3);color:#c7ffe0;font-weight:700}
-    .dot{width:10px;height:10px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 6px rgba(53,195,107,.12)}
-    .title{display:flex;flex-direction:column;gap:2px}
-    h1{margin:0;font-size:18px}
-    .sub{margin:0;color:var(--mut);font-size:13px}
-    main{max-width:1200px;margin:0 auto;display:grid;gap:14px;grid-template-columns: 1.15fr .85fr}
-    @media (max-width: 980px){ main{grid-template-columns:1fr} }
-    .card{background:var(--card);border:1px solid var(--stroke);border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    @media (max-width: 980px){ .row{grid-template-columns:1fr} }
-    .big{font-size:56px;line-height:1;font-weight:900;margin:6px 0 0}
-    .label{color:var(--mut);font-weight:700}
-    .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-    .btns2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-    button{border:0;border-radius:14px;padding:12px 14px;font-weight:900;cursor:pointer}
-    .b1{background:rgba(53,195,107,.92);color:#062012}
-    .b2{background:rgba(255,255,255,.08);border:1px solid var(--stroke);color:var(--txt)}
-    .b3{background:rgba(215,178,74,.92);color:#2a2106}
-    .b4{background:rgba(212,90,90,.92);color:#240708}
-    button:disabled{opacity:.5;cursor:not-allowed}
-    .grid2{display:grid;grid-template-columns:1fr;gap:12px}
-    .small{font-size:12px;color:var(--mut)}
-    .kpi{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
-    .chip{background:rgba(255,255,255,.06);border:1px solid var(--stroke);padding:8px 10px;border-radius:14px;font-weight:800}
-    .chip span{color:var(--mut);font-weight:700;margin-right:6px}
-    .videoWrap{position:relative;border-radius:16px;overflow:hidden;background:rgba(0,0,0,.25);border:1px solid var(--stroke)}
-    video{width:100%;height:auto;display:block;transform: scaleX(-1);} /* espejo tipo selfie; si no lo quieres, bórralo */
-    canvas#overlay{position:absolute;inset:0;pointer-events:none}
-    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-    .controls label{display:block;font-size:12px;color:var(--mut);font-weight:800;margin-bottom:6px}
+    body{
+      margin:0; min-height:100vh;
+      background: radial-gradient(1200px 700px at 20% 10%, #0b2a5a 0%, var(--bg1) 45%, var(--bg2) 100%);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      padding:18px;
+    }
+    .topbar{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    .pill{
+      display:inline-flex;align-items:center;gap:10px;
+      padding:8px 12px;border:1px solid var(--stroke);
+      background:rgba(0,0,0,.25);border-radius:999px;
+      font-weight:700;letter-spacing:.3px
+    }
+    .dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 14px rgba(50,208,127,.7)}
+    h1{margin:0;font-size:22px}
+    .sub{color:var(--muted);margin-top:4px;font-size:13px}
+
+    .grid{display:grid;grid-template-columns: 1.25fr .95fr;gap:14px;align-items:start}
+    @media(max-width:980px){.grid{grid-template-columns:1fr}}
+
+    .card{
+      border:1px solid var(--stroke);
+      background:var(--card);
+      border-radius:18px;
+      padding:14px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.35);
+      backdrop-filter: blur(10px);
+    }
+    .card h2{margin:0 0 10px 0;font-size:16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .spacer{flex:1}
+    .btn{
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      padding:12px 14px;border-radius:14px;
+      font-weight:800;cursor:pointer;
+      min-width:160px;text-align:center;
+      user-select:none;
+    }
+    .btn:active{transform:scale(.99)}
+    .btn.green{background:rgba(50,208,127,.22);border-color:rgba(50,208,127,.45)}
+    .btn.amber{background:rgba(202,162,74,.22);border-color:rgba(202,162,74,.45)}
+    .btn.red{background:rgba(224,85,85,.22);border-color:rgba(224,85,85,.45)}
+    .btn.blue{background:rgba(74,163,255,.20);border-color:rgba(74,163,255,.42)}
+    .btn.ghost{opacity:.65}
+    .btn.full{width:100%}
+    .btn.small{padding:10px 12px;min-width:unset}
+
+    .big{
+      font-size:84px;font-weight:900;line-height:1;letter-spacing:-2px;
+      margin:10px 0 0 0;
+    }
+    .label{color:var(--muted);font-weight:700}
+    .statusline{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .tag{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:8px 10px;border-radius:999px;
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,.18);
+      font-weight:800;font-size:12px;color:var(--muted)
+    }
+    .tag strong{color:var(--text)}
+    .tag.ok{border-color:rgba(50,208,127,.4)}
+    .tag.warn{border-color:rgba(202,162,74,.4)}
+    .tag.bad{border-color:rgba(224,85,85,.4)}
+    .tag.blue{border-color:rgba(74,163,255,.4)}
+
+    .field{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,.20);
+      color:var(--text);
+      font-weight:700;
+      outline:none;
+    }
+    .mini{font-size:12px;color:var(--muted);margin-top:8px}
+
+    .camWrap{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--stroke)}
+    video{width:100%;display:block;background:#000;aspect-ratio: 16/9;object-fit:cover}
+    canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+
+    .flash{
+      position:fixed;inset:0;pointer-events:none;
+      background:rgba(50,208,127,.18);
+      opacity:0;transition:opacity .12s ease;
+    }
+    .flash.on{opacity:1}
+    .log{max-height:260px;overflow:auto;border-radius:14px;border:1px solid var(--stroke);padding:10px;background:rgba(0,0,0,.18)}
+    .logItem{display:flex;justify-content:space-between;gap:10px;padding:8px 8px;border-bottom:1px solid rgba(255,255,255,.06)}
+    .logItem:last-child{border-bottom:none}
+    .logItem b{font-weight:900}
+    .right{text-align:right;color:var(--muted);font-weight:800}
+    .hr{height:1px;background:rgba(255,255,255,.08);margin:12px 0}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media(max-width:980px){.two{grid-template-columns:1fr}}
+    .k{font-weight:900}
+    .sliderRow{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center}
     input[type="range"]{width:100%}
-    input[type="text"]{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--stroke);background:rgba(0,0,0,.25);color:var(--txt);font-weight:800}
-    .log{max-height:240px;overflow:auto;background:var(--card2);border:1px solid var(--stroke);border-radius:14px;padding:10px}
-    .logItem{display:flex;justify-content:space-between;gap:12px;padding:8px 8px;border-bottom:1px dashed rgba(255,255,255,.08);font-weight:800}
-    .logItem:last-child{border-bottom:0}
-    .mut{color:var(--mut);font-weight:700}
-    .rightTop{display:grid;gap:12px}
-    .hint{margin-top:10px;color:var(--mut);font-size:12px}
+    .num{padding:10px 10px;border-radius:12px;border:1px solid var(--stroke);background:rgba(0,0,0,.18);text-align:center;font-weight:900}
   </style>
 </head>
+
 <body>
-  <header>
-    <div class="title">
-      <div class="pill"><span class="dot"></span> ONLINE</div>
+  <div class="flash" id="flash"></div>
+
+  <div class="topbar">
+    <div class="pill"><span class="dot"></span>ONLINE</div>
+    <div>
       <h1>VDC Contador de Patas</h1>
-      <p class="sub">Paso B2 — Conteo automático por cámara (sin servidor). iPhone fijo en tripié.</p>
+      <div class="sub">Paso B2 (movimiento) + Paso B3 (detección objeto con OpenCV). Guardado local.</div>
     </div>
-    <div class="small" id="clock">Hora local: --:--:--</div>
-  </header>
+  </div>
 
-  <main>
+  <div class="grid">
     <!-- IZQUIERDA -->
-    <section class="card">
+    <div class="card">
+      <h2>Conteo</h2>
+
       <div class="row">
-        <div class="card" style="background:rgba(255,255,255,.05)">
-          <div class="label">Conteo</div>
-          <div class="big"><span id="count">0</span> <span style="font-size:18px;font-weight:800;color:var(--mut)">patas</span></div>
-
-          <div class="kpi">
-            <div class="chip"><span>Estado</span> <b id="state">PAUSADO</b></div>
-            <div class="chip"><span>Sesión</span> <b id="sessionTag">(sin nombre)</b></div>
-          </div>
-
-          <div class="btns">
-            <button class="b1" id="btnStart">INICIAR</button>
-            <button class="b2" id="btnPause" disabled>PAUSAR</button>
-          </div>
-          <div class="btns2">
-            <button class="b3" id="btnUndo" disabled>DESHACER</button>
-            <button class="b2" id="btnCSV">EXPORTAR (CSV)</button>
-          </div>
-          <div class="btns2">
-            <button class="b4" id="btnReset">REINICIAR A CERO</button>
-            <button class="b2" id="btnClearLog">LIMPIAR BITÁCORA</button>
-          </div>
-
-          <div class="hint">
-            Tip: el conteo y bitácora se guardan en este iPhone (local). Luego lo conectamos con Mac/Supabase.
-          </div>
+        <div>
+          <div class="big" id="count">0</div>
+          <div class="label">patas</div>
         </div>
+        <div class="spacer"></div>
 
-        <div class="card" style="background:rgba(255,255,255,.05)">
-          <div class="label">Nombre de sesión (opcional)</div>
-          <input id="sessionName" type="text" placeholder="Ej. Camión 7:00 AM — Martes" />
-
-          <div class="kpi" style="margin-top:10px">
-            <div class="chip"><span>Guardado</span> <b id="saved">listo</b></div>
-            <div class="chip"><span>Último</span> <b id="lastSaved">--/-- --:--:--</b></div>
-          </div>
-
-          <div style="margin-top:12px" class="label">Bitácora (últimos eventos)</div>
-          <div class="log" id="log"></div>
-          <div class="small" style="margin-top:8px">
-            Empieza con <b>INICIAR</b>. Se guarda automáticamente.
+        <div style="min-width:280px">
+          <input class="field" id="sessionName" placeholder="Nombre de sesión (opcional) Ej. Camión 7:00 AM - Martes">
+          <div class="statusline">
+            <span class="tag ok"><strong id="savedState">Guardado:</strong> <span id="savedText">listo</span></span>
+            <span class="tag blue"><strong>Último:</strong> <span id="lastSaved">—</span></span>
           </div>
         </div>
       </div>
-    </section>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <div class="btn green" id="btnStart">INICIAR</div>
+        <div class="btn ghost" id="btnPause">PAUSAR</div>
+        <div class="btn amber" id="btnPlus">+1 PATA</div>
+        <div class="btn ghost" id="btnUndo">DESHACER</div>
+        <div class="btn red" id="btnReset">REINICIAR A CERO</div>
+        <div class="btn blue" id="btnCSV">EXPORTAR (CSV)</div>
+      </div>
+
+      <div class="mini">
+        Tip: iPhone fijo en tripié apuntando al tanque IBP. Cuenta cuando la pata entra al ROI y cruza la línea.
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="two">
+        <div class="card" style="padding:12px">
+          <h2 style="margin:0 0 10px 0">Modo Cámara</h2>
+          <div class="row">
+            <button class="btn green small" id="btnCamOn">ACTIVAR CÁMARA</button>
+            <button class="btn small" id="btnCamOff">APAGAR</button>
+            <button class="btn small" id="btnFlip">CAMBIAR CÁMARA</button>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="row">
+            <span class="tag warn"><strong>Estado:</strong> <span id="runState">PAUSADO</span></span>
+            <span class="tag blue"><strong>Modo:</strong> <span id="modeText">B2</span></span>
+            <span class="tag"><strong>Debug:</strong> <span id="dbgText">OFF</span></span>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="row">
+            <button class="btn small blue" id="btnMode">CAMBIAR B2/B3</button>
+            <button class="btn small" id="btnDebug">DEBUG</button>
+            <button class="btn small" id="btnCalib">CALIBRAR (10s)</button>
+          </div>
+
+          <div class="mini">
+            B2 = movimiento (rápido). B3 = detección de objeto (más estable con agua/sombra).  
+            Si “no contó nada”, prende DEBUG y mira la métrica.
+          </div>
+        </div>
+
+        <div class="card" style="padding:12px">
+          <h2 style="margin:0 0 10px 0">Ajustes (en vivo)</h2>
+
+          <div class="sliderRow">
+            <div>
+              <div class="label">ROI (tamaño del cuadro)</div>
+              <input id="roi" type="range" min="35" max="90" value="65">
+            </div>
+            <div class="num"><span id="roiVal">65</span>%</div>
+          </div>
+
+          <div class="sliderRow">
+            <div>
+              <div class="label">Línea de conteo (altura dentro del ROI)</div>
+              <input id="lineY" type="range" min="15" max="85" value="55">
+            </div>
+            <div class="num"><span id="lineYVal">55</span>%</div>
+          </div>
+
+          <div class="sliderRow">
+            <div>
+              <div class="label">Sensibilidad (B2: umbral)</div>
+              <input id="thr" type="range" min="3" max="30" value="14">
+            </div>
+            <div class="num"><span id="thrVal">0.14</span></div>
+          </div>
+
+          <div class="sliderRow">
+            <div>
+              <div class="label">Cooldown (ms)</div>
+              <input id="cool" type="range" min="400" max="3000" value="1400">
+            </div>
+            <div class="num"><span id="coolVal">1400</span></div>
+          </div>
+
+          <div class="sliderRow">
+            <div>
+              <div class="label">B3: área mínima (objeto)</div>
+              <input id="minArea" type="range" min="300" max="6000" value="1600">
+            </div>
+            <div class="num"><span id="minAreaVal">1600</span></div>
+          </div>
+
+          <div class="mini">
+            Umbral recomendado para tanque: 0.10–0.16.  
+            Si no cuenta: baja umbral. Si cuenta doble: sube cooldown.
+          </div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="camWrap">
+        <video id="video" playsinline muted></video>
+        <canvas id="cv"></canvas>
+      </div>
+    </div>
 
     <!-- DERECHA -->
-    <aside class="card rightTop">
-      <div class="label">Modo Cámara (Paso B2)</div>
-      <div class="videoWrap">
-        <video id="video" playsinline muted></video>
-        <canvas id="overlay"></canvas>
+    <div class="card">
+      <h2>Bitácora (últimos eventos)</h2>
+      <div class="row">
+        <span class="tag"><strong id="logCount">0</strong> evento(s)</span>
+        <span class="spacer"></span>
+        <span class="tag blue"><strong>Hora local:</strong> <span id="clock">—</span></span>
       </div>
 
-      <div class="btns">
-        <button class="b1" id="btnCamOn">ACTIVAR CÁMARA</button>
-        <button class="b2" id="btnCamOff" disabled>APAGAR CÁMARA</button>
+      <div class="hr"></div>
+
+      <div class="log" id="log"></div>
+
+      <div class="hr"></div>
+
+      <div class="mini">
+        iPhone: abre en Safari → “ACTIVAR CÁMARA”.  
+        Si no pide permisos: Ajustes → Safari → Cámara → Permitir.
       </div>
+    </div>
+  </div>
 
-      <div class="controls">
-        <div>
-          <label>Umbral de detección (sensibilidad): <b id="thrVal">0.18</b></label>
-          <input id="thr" type="range" min="0.05" max="0.60" step="0.01" value="0.18" />
-          <div class="small">Más alto = menos sensible. Empieza en 0.18–0.28.</div>
-        </div>
-        <div>
-          <label>Cooldown (ms) anti doble conteo: <b id="coolVal">900</b></label>
-          <input id="cool" type="range" min="300" max="2500" step="50" value="900" />
-          <div class="small">Si cuenta doble, súbelo a 1200–1500.</div>
-        </div>
-      </div>
+  <!-- OpenCV (solo se usa en B3) -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
-      <div class="controls">
-        <div>
-          <label>Tamaño zona (ROI): <b id="roiVal">60%</b></label>
-          <input id="roi" type="range" min="30" max="90" step="1" value="60" />
-          <div class="small">Zona al centro. Ajusta para cubrir la “caída”.</div>
-        </div>
-        <div>
-          <label>Debug (ver energía)</label>
-          <button class="b2" id="btnDebug">VER DEBUG: OFF</button>
-          <div class="small">Muestra barras para calibrar umbral.</div>
-        </div>
-      </div>
+  <script>
+    // ====== Estado ======
+    const LS_KEY = "vdc_patas_state_v3";
+    let state = {
+      count: 0,
+      running: false,
+      mode: "B2", // B2 | B3
+      debug: false,
+      sessionName: "",
+      events: [],
+      lastSaved: null,
+      roiPct: 65,
+      lineYPct: 55,
+      thr: 0.14,
+      cooldownMs: 1400,
+      minArea: 1600,
+      camera: { facingMode: "environment" } // or "user"
+    };
 
-      <div class="hint">
-        iPhone: Safari → “ACTIVAR CÁMARA”. Si no pide permisos: Ajustes → Safari → Cámara → Permitir.
-      </div>
-    </aside>
-  </main>
+    // ====== UI ======
+    const $ = (id)=>document.getElementById(id);
+    const flash = $("flash");
+    const countEl = $("count");
+    const logEl = $("log");
+    const logCountEl = $("logCount");
+    const savedText = $("savedText");
+    const lastSavedEl = $("lastSaved");
+    const runState = $("runState");
+    const modeText = $("modeText");
+    const dbgText = $("dbgText");
+    const clockEl = $("clock");
 
-<script>
-(() => {
-  // ====== Estado ======
-  const LS_KEY = "vdc_patas_b2_v1";
+    const video = $("video");
+    const canvas = $("cv");
+    const ctx = canvas.getContext("2d");
 
-  const el = (id) => document.getElementById(id);
+    // sliders
+    const roi = $("roi"), lineY = $("lineY"), thr = $("thr"), cool = $("cool"), minArea = $("minArea");
+    const roiVal = $("roiVal"), lineYVal = $("lineYVal"), thrVal = $("thrVal"), coolVal = $("coolVal"), minAreaVal = $("minAreaVal");
 
-  const $count = el("count");
-  const $state = el("state");
-  const $sessionName = el("sessionName");
-  const $sessionTag = el("sessionTag");
-  const $saved = el("saved");
-  const $lastSaved = el("lastSaved");
-  const $log = el("log");
-  const $clock = el("clock");
-
-  const btnStart = el("btnStart");
-  const btnPause = el("btnPause");
-  const btnUndo = el("btnUndo");
-  const btnReset = el("btnReset");
-  const btnCSV = el("btnCSV");
-  const btnClearLog = el("btnClearLog");
-
-  const video = el("video");
-  const overlay = el("overlay");
-  const ctxO = overlay.getContext("2d");
-
-  const btnCamOn = el("btnCamOn");
-  const btnCamOff = el("btnCamOff");
-
-  const thr = el("thr"), thrVal = el("thrVal");
-  const cool = el("cool"), coolVal = el("coolVal");
-  const roi = el("roi"), roiVal = el("roiVal");
-  const btnDebug = el("btnDebug");
-
-  let debugOn = false;
-
-  let app = {
-    running: false,
-    count: 0,
-    sessionName: "",
-    events: [], // {ts,type,msg,count}
-    undoStack: [], // previous counts
-    lastSavedISO: null,
-    // detector
-    camOn: false,
-    lastTriggerAt: 0,
-    lastFrame: null,
-    energy: 0
-  };
-
-  // ====== Utils ======
-  const pad2 = (n) => String(n).padStart(2,"0");
-  function nowStr(){
-    const d = new Date();
-    return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-  }
-  function logEvent(type, msg){
-    const item = { ts: new Date().toISOString(), type, msg, count: app.count };
-    app.events.unshift(item);
-    app.events = app.events.slice(0, 80);
-    renderLog();
-    save();
-  }
-  function save(){
-    try{
-      app.sessionName = $sessionName.value.trim();
-      localStorage.setItem(LS_KEY, JSON.stringify(app));
-      app.lastSavedISO = new Date().toISOString();
-      $saved.textContent = "listo";
-      $lastSaved.textContent = nowStr();
-    }catch(e){
-      $saved.textContent = "error";
-    }
-  }
-  function load(){
-    const raw = localStorage.getItem(LS_KEY);
-    if(!raw) return;
-    try{
-      const obj = JSON.parse(raw);
-      app = Object.assign(app, obj);
-    }catch(e){}
-  }
-
-  function setRunning(r){
-    app.running = r;
-    $state.textContent = r ? "CONTANDO" : "PAUSADO";
-    btnStart.disabled = r;
-    btnPause.disabled = !r;
-    btnUndo.disabled = app.undoStack.length === 0;
-    save();
-  }
-
-  function setCount(n){
-    app.count = Math.max(0, n|0);
-    $count.textContent = app.count;
-    btnUndo.disabled = app.undoStack.length === 0;
-    save();
-  }
-
-  function render(){
-    $count.textContent = app.count;
-    $sessionName.value = app.sessionName || "";
-    $sessionTag.textContent = app.sessionName ? app.sessionName : "(sin nombre)";
-    $state.textContent = app.running ? "CONTANDO" : "PAUSADO";
-    btnStart.disabled = app.running;
-    btnPause.disabled = !app.running;
-    btnUndo.disabled = app.undoStack.length === 0;
-
-    if(app.lastSavedISO){
-      $lastSaved.textContent = nowStr();
-    }
-    renderLog();
-  }
-
-  function renderLog(){
-    if(app.events.length === 0){
-      $log.innerHTML = `<div class="logItem"><span class="mut">Sin eventos</span><span class="mut">Empieza con INICIAR</span></div>`;
-      return;
-    }
-    $log.innerHTML = app.events.map(e=>{
-      const d = new Date(e.ts);
-      const ts = `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-      return `<div class="logItem">
-        <span>${e.type} <span class="mut">${ts}</span></span>
-        <span class="mut">Conteo ${e.count}</span>
-      </div>`;
-    }).join("");
-  }
-
-  // ====== CSV ======
-  function downloadCSV(){
-    const rows = [
-      ["timestamp","tipo","mensaje","conteo"],
-      ...app.events.slice().reverse().map(e=>[e.ts, e.type, e.msg, e.count])
-    ];
-    const csv = rows.map(r=>r.map(v=>{
-      const s = String(v ?? "");
-      return `"${s.replaceAll('"','""')}"`;
-    }).join(",")).join("\n");
-    const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const safeName = (app.sessionName || "sesion").replaceAll(/[^\w\- ]+/g,"").trim().replaceAll(" ","_");
-    a.href = url;
-    a.download = `vdc_patas_${safeName}_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  // ====== Cámara + detector por diferencia de frames ======
-  let stream = null;
-  const workCanvas = document.createElement("canvas");
-  const wctx = workCanvas.getContext("2d", { willReadFrequently: true });
-
-  function resizeOverlay(){
-    const rect = video.getBoundingClientRect();
-    overlay.width = Math.floor(rect.width * devicePixelRatio);
-    overlay.height = Math.floor(rect.height * devicePixelRatio);
-  }
-
-  function drawROIBox(roiPx){
-    ctxO.clearRect(0,0,overlay.width,overlay.height);
-
-    // ROI centrada
-    const w = overlay.width;
-    const h = overlay.height;
-    const size = Math.min(w,h) * roiPx;
-    const x = (w - size)/2;
-    const y = (h - size)/2;
-
-    // marco
-    ctxO.strokeStyle = "rgba(53,195,107,.85)";
-    ctxO.lineWidth = 4;
-    ctxO.strokeRect(x, y, size, size);
-
-    // texto
-    ctxO.fillStyle = "rgba(255,255,255,.85)";
-    ctxO.font = `${16*devicePixelRatio}px ui-sans-serif, system-ui`;
-    ctxO.fillText("Zona de conteo", x+10, y+26);
-
-    if(debugOn){
-      // barra energía
-      const barW = size;
-      const barH = 10*devicePixelRatio;
-      const bx = x;
-      const by = y + size + 14*devicePixelRatio;
-      ctxO.fillStyle = "rgba(255,255,255,.12)";
-      ctxO.fillRect(bx, by, barW, barH);
-
-      const e = Math.max(0, Math.min(1, app.energy));
-      ctxO.fillStyle = "rgba(215,178,74,.85)";
-      ctxO.fillRect(bx, by, barW*e, barH);
-
-      ctxO.fillStyle = "rgba(255,255,255,.85)";
-      ctxO.fillText(`energía: ${app.energy.toFixed(2)}  umbral: ${parseFloat(thr.value).toFixed(2)}`, bx, by + 28*devicePixelRatio);
+    // ====== Audio (beep) ======
+    let audioCtx = null;
+    function beep(){
+      try{
+        if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = "sine";
+        o.frequency.value = 880;
+        g.gain.value = 0.06;
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start();
+        setTimeout(()=>{o.stop();}, 80);
+      }catch(e){}
     }
 
-    return {x, y, size};
-  }
-
-  function computeEnergy(curr, prev){
-    // curr, prev: Uint8ClampedArray RGBA, mismo tamaño
-    // energía = promedio de |lum(curr)-lum(prev)| / 255
-    const len = curr.length;
-    let sum = 0;
-    for(let i=0;i<len;i+=4){
-      const lumC = (curr[i]*0.2126 + curr[i+1]*0.7152 + curr[i+2]*0.0722);
-      const lumP = (prev[i]*0.2126 + prev[i+1]*0.7152 + prev[i+2]*0.0722);
-      sum += Math.abs(lumC - lumP);
-    }
-    const pixels = len/4;
-    return (sum / pixels) / 255;
-  }
-
-  function tick(){
-    if(!app.camOn) return;
-
-    // adaptar canvas a video real (resolución interna)
-    const vw = video.videoWidth, vh = video.videoHeight;
-    if(vw === 0 || vh === 0){
-      requestAnimationFrame(tick);
-      return;
+    function vibrate(){
+      try{ navigator.vibrate?.(60); }catch(e){}
     }
 
-    // ROI porcentaje
-    const roiPct = parseInt(roi.value,10)/100;
-    roiVal.textContent = `${parseInt(roi.value,10)}%`;
+    // ====== Persistencia ======
+    function load(){
+      try{
+        const raw = localStorage.getItem(LS_KEY);
+        if(raw){
+          const s = JSON.parse(raw);
+          state = {...state, ...s};
+        }
+      }catch(e){}
+      // sync UI
+      $("sessionName").value = state.sessionName || "";
+      roi.value = state.roiPct; lineY.value = state.lineYPct;
+      thr.value = Math.round(state.thr*100);
+      cool.value = state.cooldownMs;
+      minArea.value = state.minArea;
+      updateUI();
+      renderLog();
+    }
 
-    // dibujar frame en workCanvas a resolución reducida (performance)
-    const scale = 0.35; // baja si se calienta el iPhone
-    const cw = Math.floor(vw*scale);
-    const ch = Math.floor(vh*scale);
-    workCanvas.width = cw;
-    workCanvas.height = ch;
-    wctx.drawImage(video, 0, 0, cw, ch);
+    function save(){
+      state.lastSaved = new Date().toISOString();
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      savedText.textContent = "listo";
+      lastSavedEl.textContent = fmtTime(state.lastSaved);
+    }
 
-    // ROI centrada en workCanvas
-    const size = Math.floor(Math.min(cw, ch) * roiPct);
-    const x = Math.floor((cw - size)/2);
-    const y = Math.floor((ch - size)/2);
+    function autosave(){
+      savedText.textContent = "guardando…";
+      save();
+    }
 
-    const img = wctx.getImageData(x, y, size, size);
-    const curr = img.data;
+    function fmtTime(iso){
+      try{
+        const d = new Date(iso);
+        return d.toLocaleString();
+      }catch(e){ return "—"; }
+    }
 
-    if(app.lastFrame){
-      const energy = computeEnergy(curr, app.lastFrame);
-      app.energy = energy;
+    // ====== Log ======
+    function pushEvent(type, extra={}){
+      const ev = {
+        type,
+        ts: new Date().toISOString(),
+        count: state.count,
+        mode: state.mode,
+        ...extra
+      };
+      state.events.unshift(ev);
+      state.events = state.events.slice(0, 80);
+      autosave();
+      renderLog();
+    }
 
-      // Trigger
-      const threshold = parseFloat(thr.value);
-      const cooldownMs = parseInt(cool.value,10);
-
-      const now = Date.now();
-      const canTrigger = (now - app.lastTriggerAt) > cooldownMs;
-
-      if(app.running && canTrigger && energy >= threshold){
-        // contar
-        app.undoStack.push(app.count);
-        setCount(app.count + 1);
-        app.lastTriggerAt = now;
-        logEvent("AUTO_COUNT", `Detección por energía=${energy.toFixed(2)} (umbral=${threshold.toFixed(2)})`);
+    function renderLog(){
+      logEl.innerHTML = "";
+      logCountEl.textContent = state.events.length;
+      if(state.events.length === 0){
+        logEl.innerHTML = `<div class="logItem"><b>Sin eventos</b><span class="right">Empieza con INICIAR</span></div>`;
+        return;
+      }
+      for(const ev of state.events){
+        const t = new Date(ev.ts).toLocaleString();
+        const right = `Conteo ${ev.count}`;
+        logEl.insertAdjacentHTML("beforeend", `
+          <div class="logItem">
+            <div>
+              <b>${ev.type}</b>
+              <div class="mini">${t} • ${ev.mode}${ev.note ? " • "+ev.note : ""}</div>
+            </div>
+            <div class="right">${right}</div>
+          </div>
+        `);
       }
     }
 
-    // guardar frame actual como referencia (clonar)
-    app.lastFrame = new Uint8ClampedArray(curr);
+    // ====== UI State ======
+    function updateUI(){
+      countEl.textContent = state.count;
+      runState.textContent = state.running ? "CORRIENDO" : "PAUSADO";
+      modeText.textContent = state.mode;
+      dbgText.textContent = state.debug ? "ON" : "OFF";
+      lastSavedEl.textContent = state.lastSaved ? fmtTime(state.lastSaved) : "—";
 
-    // dibujar overlay (ROI box) en tamaño visual
-    resizeOverlay();
-    const roiBox = drawROIBox(roiPct);
-
-    // opcional: marcar trigger visual (flash)
-    // (simple: si energía alta, pinta leve)
-    if(debugOn && app.energy >= parseFloat(thr.value)){
-      ctxO.fillStyle = "rgba(215,178,74,.08)";
-      ctxO.fillRect(roiBox.x, roiBox.y, roiBox.size, roiBox.size);
+      roiVal.textContent = state.roiPct;
+      lineYVal.textContent = state.lineYPct;
+      thrVal.textContent = (state.thr).toFixed(2);
+      coolVal.textContent = state.cooldownMs;
+      minAreaVal.textContent = state.minArea;
     }
 
-    requestAnimationFrame(tick);
-  }
-
-  async function camOn(){
-    if(app.camOn) return;
-    try{
-      // Cámara trasera preferida
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false
-      });
-      video.srcObject = stream;
-      await video.play();
-      app.camOn = true;
-      app.lastFrame = null;
-      app.lastTriggerAt = 0;
-      btnCamOn.disabled = true;
-      btnCamOff.disabled = false;
-      logEvent("CAMARA_ON", "Cámara activada");
-      tick();
-    }catch(err){
-      logEvent("ERROR", "No se pudo activar cámara (permiso/https)");
-      alert("No se pudo activar la cámara. Revisa permisos en Safari y que estés en https.");
+    function flashGreen(){
+      flash.classList.add("on");
+      setTimeout(()=>flash.classList.remove("on"), 120);
     }
-  }
 
-  function camOff(){
-    if(!app.camOn) return;
-    try{
-      stream?.getTracks()?.forEach(t=>t.stop());
-    }catch(e){}
-    stream = null;
-    video.srcObject = null;
-    app.camOn = false;
-    app.lastFrame = null;
-    btnCamOn.disabled = false;
-    btnCamOff.disabled = true;
-    logEvent("CAMARA_OFF", "Cámara apagada");
-    ctxO.clearRect(0,0,overlay.width,overlay.height);
-  }
+    function countedVisual(note=""){
+      flashGreen();
+      beep();
+      vibrate();
+      pushEvent("CONTEO +1", note ? {note} : {});
+    }
 
-  // ====== UI Events ======
-  btnStart.addEventListener("click", ()=>{
-    setRunning(true);
-    logEvent("INICIAR", "Conteo iniciado");
-  });
-  btnPause.addEventListener("click", ()=>{
-    setRunning(false);
-    logEvent("PAUSAR", "Conteo pausado");
-  });
+    // ====== Controls ======
+    $("btnStart").onclick = ()=>{
+      state.running = true;
+      autosave();
+      pushEvent("INICIAR");
+      updateUI();
+    };
+    $("btnPause").onclick = ()=>{
+      state.running = false;
+      autosave();
+      pushEvent("PAUSAR");
+      updateUI();
+    };
+    $("btnPlus").onclick = ()=>{
+      state.count += 1;
+      countedVisual("manual");
+      updateUI();
+    };
+    $("btnUndo").onclick = ()=>{
+      state.count = Math.max(0, state.count - 1);
+      pushEvent("DESHACER");
+      autosave();
+      updateUI();
+    };
+    $("btnReset").onclick = ()=>{
+      state.count = 0;
+      pushEvent("REINICIAR");
+      autosave();
+      updateUI();
+    };
+    $("btnCSV").onclick = ()=>{
+      const rows = [["ts","type","count","mode","note"]];
+      for(const ev of [...state.events].reverse()){
+        rows.push([ev.ts, ev.type, ev.count, ev.mode, ev.note || ""]);
+      }
+      const csv = rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `vdc_patas_${(state.sessionName||"sesion").replaceAll(" ","_")}_${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      pushEvent("EXPORTAR CSV");
+    };
 
-  btnUndo.addEventListener("click", ()=>{
-    if(app.undoStack.length === 0) return;
-    const prev = app.undoStack.pop();
-    setCount(prev);
-    logEvent("UNDO", "Deshacer último cambio");
-  });
+    $("sessionName").oninput = (e)=>{
+      state.sessionName = e.target.value || "";
+      autosave();
+      updateUI();
+    };
 
-  btnReset.addEventListener("click", ()=>{
-    if(!confirm("¿Reiniciar a cero?")) return;
-    app.undoStack.push(app.count);
-    setCount(0);
-    logEvent("RESET", "Reiniciado a cero");
-  });
+    $("btnDebug").onclick = ()=>{
+      state.debug = !state.debug;
+      pushEvent(state.debug ? "DEBUG ON" : "DEBUG OFF");
+      autosave();
+      updateUI();
+    };
 
-  btnCSV.addEventListener("click", downloadCSV);
+    $("btnMode").onclick = ()=>{
+      state.mode = (state.mode === "B2") ? "B3" : "B2";
+      pushEvent("CAMBIO MODO", {note: state.mode});
+      autosave();
+      updateUI();
+    };
 
-  btnClearLog.addEventListener("click", ()=>{
-    if(!confirm("¿Borrar bitácora?")) return;
-    app.events = [];
-    renderLog();
-    save();
-  });
+    $("btnCalib").onclick = ()=>{
+      // Calibration: sets threshold based on baseline motion for 10s (B2 only)
+      if(state.mode !== "B2"){
+        pushEvent("CALIBRAR", {note:"solo B2"});
+        return;
+      }
+      calibrating = true;
+      calibStart = performance.now();
+      calibSamples = [];
+      pushEvent("CALIBRAR", {note:"10s"});
+    };
 
-  $sessionName.addEventListener("input", ()=>{
-    app.sessionName = $sessionName.value.trim();
-    $sessionTag.textContent = app.sessionName ? app.sessionName : "(sin nombre)";
-    save();
-  });
+    // sliders bindings
+    roi.oninput = ()=>{ state.roiPct = +roi.value; autosave(); updateUI(); };
+    lineY.oninput = ()=>{ state.lineYPct = +lineY.value; autosave(); updateUI(); };
+    thr.oninput = ()=>{ state.thr = (+thr.value)/100; autosave(); updateUI(); };
+    cool.oninput = ()=>{ state.cooldownMs = +cool.value; autosave(); updateUI(); };
+    minArea.oninput = ()=>{ state.minArea = +minArea.value; autosave(); updateUI(); };
 
-  thr.addEventListener("input", ()=>{ thrVal.textContent = parseFloat(thr.value).toFixed(2); });
-  cool.addEventListener("input", ()=>{ coolVal.textContent = parseInt(cool.value,10); });
+    // ====== Camera ======
+    let stream = null;
+    let usingFront = false;
 
-  btnDebug.addEventListener("click", ()=>{
-    debugOn = !debugOn;
-    btnDebug.textContent = `VER DEBUG: ${debugOn ? "ON" : "OFF"}`;
-  });
+    $("btnFlip").onclick = async ()=>{
+      usingFront = !usingFront;
+      state.camera.facingMode = usingFront ? "user" : "environment";
+      pushEvent("CAMBIO CÁMARA", {note: state.camera.facingMode});
+      await stopCamera();
+      await startCamera();
+    };
 
-  btnCamOn.addEventListener("click", camOn);
-  btnCamOff.addEventListener("click", camOff);
+    $("btnCamOn").onclick = async ()=>{
+      await startCamera();
+    };
+    $("btnCamOff").onclick = async ()=>{
+      await stopCamera();
+      pushEvent("CAMARA_OFF");
+    };
 
-  // ====== reloj ======
-  setInterval(()=>{ $clock.textContent = `Hora local: ${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}:${pad2(new Date().getSeconds())}`; }, 250);
+    async function startCamera(){
+      try{
+        if(stream) await stopCamera();
 
-  // ====== Boot ======
-  load();
-  render();
-  thrVal.textContent = parseFloat(thr.value).toFixed(2);
-  coolVal.textContent = parseInt(cool.value,10);
+        // iOS: must be triggered by user gesture (button)
+        const constraints = {
+          audio:false,
+          video:{
+            facingMode: state.camera.facingMode,
+            width: { ideal: 1280 },
+            height:{ ideal: 720 }
+          }
+        };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        await video.play();
 
-})();
-</script>
+        pushEvent("CAMARA_ON");
+        autosave();
+      }catch(err){
+        pushEvent("CAMARA_ERROR", {note: String(err?.message || err)});
+        alert("No se pudo activar cámara. Revisa permisos de Safari → Cámara → Permitir.");
+      }
+    }
+
+    async function stopCamera(){
+      try{
+        if(video.srcObject){
+          video.pause();
+          video.srcObject = null;
+        }
+        if(stream){
+          stream.getTracks().forEach(t=>t.stop());
+          stream = null;
+        }
+      }catch(e){}
+    }
+
+    // ====== Vision Loop ======
+    let lastCountAt = 0;
+
+    // For B2 motion
+    let lastFrame = null; // ImageData
+    let lastMetric = 0;
+
+    // Calibration
+    let calibrating = false;
+    let calibStart = 0;
+    let calibSamples = [];
+
+    // B3 OpenCV
+    let cvReady = false;
+    let bgsub = null;
+    let kernel = null;
+    let lastCross = false;
+
+    function ensureCanvas(){
+      const w = video.videoWidth || 1280;
+      const h = video.videoHeight || 720;
+      if(canvas.width !== w || canvas.height !== h){
+        canvas.width = w;
+        canvas.height = h;
+      }
+    }
+
+    function getROI(){
+      const w = canvas.width, h = canvas.height;
+      const pct = state.roiPct/100;
+      const rw = Math.floor(w*pct);
+      const rh = Math.floor(h*pct);
+      const x = Math.floor((w - rw)/2);
+      const y = Math.floor((h - rh)/2);
+      return {x,y,rw,rh};
+    }
+
+    function drawOverlay(metricText=""){
+      const {x,y,rw,rh} = getROI();
+      const lineYLocal = y + Math.floor(rh*(state.lineYPct/100));
+
+      // ROI
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(74,163,255,.75)";
+      ctx.strokeRect(x,y,rw,rh);
+
+      // line
+      ctx.beginPath();
+      ctx.moveTo(x, lineYLocal);
+      ctx.lineTo(x+rw, lineYLocal);
+      ctx.strokeStyle = "rgba(50,208,127,.85)";
+      ctx.stroke();
+
+      // debug text
+      if(state.debug){
+        ctx.fillStyle = "rgba(0,0,0,.55)";
+        ctx.fillRect(14, 14, 440, 110);
+        ctx.fillStyle = "rgba(255,255,255,.92)";
+        ctx.font = "bold 18px ui-sans-serif, system-ui";
+        ctx.fillText(`Modo ${state.mode} • ${state.running ? "RUN" : "PAUSE"}`, 24, 42);
+        ctx.font = "bold 16px ui-sans-serif, system-ui";
+        ctx.fillText(metricText, 24, 70);
+        ctx.font = "14px ui-sans-serif, system-ui";
+        ctx.fillText(`thr=${state.thr.toFixed(2)} cool=${state.cooldownMs}ms minArea=${state.minArea}`, 24, 96);
+      }
+    }
+
+    function canCount(){
+      const now = performance.now();
+      return (now - lastCountAt) > state.cooldownMs;
+    }
+
+    function doCount(note="auto"){
+      if(!state.running) return;
+      if(!canCount()) return;
+
+      state.count += 1;
+      lastCountAt = performance.now();
+      autosave();
+      updateUI();
+      countedVisual(note);
+    }
+
+    // --- B2: motion metric inside ROI
+    function stepB2(){
+      const {x,y,rw,rh} = getROI();
+      const frame = ctx.getImageData(x,y,rw,rh);
+
+      if(lastFrame){
+        const a = frame.data, b = lastFrame.data;
+        let diff = 0;
+        // sample every 8 bytes to be faster
+        for(let i=0; i<a.length; i+=8){
+          // grayscale approx using R only (fast)
+          diff += Math.abs(a[i] - b[i]);
+        }
+        const norm = diff / ( (a.length/8) * 255 ); // 0..1
+        lastMetric = norm;
+
+        if(calibrating){
+          calibSamples.push(norm);
+          if(performance.now() - calibStart > 10000){
+            calibrating = false;
+            const base = calibSamples.sort((p,q)=>p-q);
+            const p95 = base[Math.floor(base.length*0.95)] || 0.02;
+            // threshold = baseline*2.4 + margin
+            const newThr = Math.min(0.30, Math.max(0.06, p95*2.4 + 0.02));
+            state.thr = +newThr.toFixed(2);
+            thr.value = Math.round(state.thr*100);
+            pushEvent("CALIBRAR OK", {note:`thr=${state.thr.toFixed(2)}`});
+            autosave(); updateUI();
+          }
+        }
+
+        // gate: count when motion crosses threshold strongly
+        if(state.running && norm > state.thr){
+          doCount(`B2 motion ${norm.toFixed(2)}`);
+        }
+      }
+
+      lastFrame = frame;
+      drawOverlay(`B2 motion=${lastMetric.toFixed(3)} (sube al caer pata)`);
+    }
+
+    // --- B3: OpenCV object detection (background subtract + contour + crossing line)
+    function initCVIfNeeded(){
+      if(cvReady) return true;
+      if(typeof cv === "undefined" || !cv.Mat) return false;
+
+      try{
+        bgsub = new cv.BackgroundSubtractorMOG2(300, 16, false);
+        kernel = cv.Mat.ones(5,5, cv.CV_8U);
+        cvReady = true;
+        pushEvent("B3 OpenCV listo");
+        autosave();
+        return true;
+      }catch(e){
+        pushEvent("B3 OpenCV error", {note:String(e)});
+        return false;
+      }
+    }
+
+    function stepB3(){
+      const ok = initCVIfNeeded();
+      const {x,y,rw,rh} = getROI();
+      const lineYLocal = y + Math.floor(rh*(state.lineYPct/100));
+
+      let metricText = "B3 cargando OpenCV…";
+      if(!ok){
+        drawOverlay(metricText);
+        return;
+      }
+
+      // grab frame
+      const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+      const src = cv.matFromImageData(img);
+
+      // ROI crop
+      const rect = new cv.Rect(x,y,rw,rh);
+      const roiMat = src.roi(rect);
+
+      // bg subtraction
+      const fg = new cv.Mat();
+      bgsub.apply(roiMat, fg);
+
+      // cleanup
+      cv.medianBlur(fg, fg, 5);
+      cv.threshold(fg, fg, 200, 255, cv.THRESH_BINARY);
+      cv.morphologyEx(fg, fg, cv.MORPH_OPEN, kernel);
+
+      // contours
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+      cv.findContours(fg, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      let best = null;
+      let bestArea = 0;
+
+      for(let i=0;i<contours.size();i++){
+        const c = contours.get(i);
+        const area = cv.contourArea(c);
+        if(area > bestArea){
+          bestArea = area;
+          best = c;
+        }
+      }
+
+      // draw ROI preview / detection
+      // First, clear and redraw video
+      // (ctx already has video frame)
+      ctx.save();
+      // draw detection bbox if any
+      let crossed = false;
+
+      if(best && bestArea >= state.minArea){
+        const r = cv.boundingRect(best);
+        // bbox global coords
+        const gx = x + r.x;
+        const gy = y + r.y;
+        const gw = r.width;
+        const gh = r.height;
+
+        // centroid global
+        const cx = gx + gw/2;
+        const cy = gy + gh/2;
+
+        // Draw bbox
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(202,162,74,.95)";
+        ctx.strokeRect(gx,gy,gw,gh);
+
+        // centroid
+        ctx.beginPath();
+        ctx.arc(cx,cy,8,0,Math.PI*2);
+        ctx.fillStyle = "rgba(202,162,74,.95)";
+        ctx.fill();
+
+        // crossing logic: count when centroid goes below the line (inside ROI)
+        const nowBelow = (cy >= lineYLocal);
+        crossed = (!lastCross && nowBelow); // transition: above -> below
+        lastCross = nowBelow;
+
+        metricText = `B3 area=${Math.round(bestArea)} centroidY=${Math.round(cy)} lineY=${lineYLocal}`;
+        if(state.running && crossed){
+          doCount(`B3 cross area=${Math.round(bestArea)}`);
+        }
+      }else{
+        metricText = `B3 sin objeto (bestArea=${Math.round(bestArea)})`;
+        lastCross = false;
+      }
+
+      // cleanup mats
+      src.delete(); roiMat.delete(); fg.delete(); contours.delete(); hierarchy.delete();
+      if(best && best.delete) { /* contour will be freed by MatVector delete */ }
+
+      drawOverlay(metricText);
+      ctx.restore();
+    }
+
+    // ====== Main Loop ======
+    function loop(){
+      requestAnimationFrame(loop);
+
+      if(!video || video.readyState < 2) {
+        // still update clock
+        clockEl.textContent = new Date().toLocaleTimeString();
+        return;
+      }
+
+      ensureCanvas();
+
+      // draw current video frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      if(state.mode === "B2") stepB2();
+      else stepB3();
+
+      clockEl.textContent = new Date().toLocaleTimeString();
+    }
+
+    // ====== Boot ======
+    load();
+    loop();
+
+    // Safety: keep autosaving timer (in case user doesn’t touch)
+    setInterval(()=>{ autosave(); }, 15000);
+  </script>
 </body>
 </html>
-
 
 
