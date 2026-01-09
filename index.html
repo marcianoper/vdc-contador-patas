@@ -126,7 +126,7 @@
     <div class="pill"><span class="dot"></span>ONLINE</div>
     <div>
       <h1>VDC Contador de Patas</h1>
-      <div class="sub">Paso B2 (movimiento) + Paso B3 (detección objeto con OpenCV). Guardado local.</div>
+      <div class="sub">Paso B2 (movimiento) + Paso B3 (detección con Roboflow). Guardado local.</div>
     </div>
   </div>
 
@@ -194,8 +194,8 @@
           </div>
 
           <div class="mini">
-            B2 = movimiento (rápido). B3 = detección de objeto (más estable con agua/sombra).  
-            Si “no contó nada”, prende DEBUG y mira la métrica.
+            B2 = movimiento (rápido). B3 = Roboflow “pata” (más estable).  
+            Si “no contó”: baja ROI, sube cooldown o ajusta confianza (en el código).
           </div>
         </div>
 
@@ -236,15 +236,15 @@
 
           <div class="sliderRow">
             <div>
-              <div class="label">B3: área mínima (objeto)</div>
+              <div class="label">B3: (Roboflow) área mínima (pata detectada)</div>
               <input id="minArea" type="range" min="300" max="6000" value="1600">
             </div>
             <div class="num"><span id="minAreaVal">1600</span></div>
           </div>
 
           <div class="mini">
-            Umbral recomendado para tanque: 0.10–0.16.  
-            Si no cuenta: baja umbral. Si cuenta doble: sube cooldown.
+            Umbral recomendado para tanque (B2): 0.10–0.16.  
+            Si cuenta doble: sube cooldown.
           </div>
         </div>
       </div>
@@ -279,10 +279,26 @@
     </div>
   </div>
 
-  <!-- OpenCV (solo se usa en B3) -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+  <!-- IMPORTANTE: ya no cargamos OpenCV -->
+  <script type="module">
+    import { InferenceEngine, CVImage } from "https://esm.sh/inferencejs";
 
-  <script>
+    // ====== Roboflow (TU MODELO) ======
+    // Si regeneras tu publishable, solo cambias aquí.
+    const RF_PUBLISHABLE_KEY = "rf_cZVpt4nSGwabGVW3Fr0rzawLieC2";
+    const RF_MODEL_SLUG = "vdc-patas";
+    const RF_MODEL_VERSION = 2;
+
+    // Roboflow engine
+    const rfEngine = new InferenceEngine();
+    let rfWorkerId = null;
+    let rfReady = false;
+    let rfLoading = false;
+
+    // Ajustes B3 (puedes moverlos si quieres)
+    const RF_CONFIDENCE = 0.65;   // confianza mínima
+    const RF_INFER_MS = 220;      // cada cuánto inferimos (ms)
+
     // ====== Estado ======
     const LS_KEY = "vdc_patas_state_v3";
     let state = {
@@ -337,7 +353,6 @@
         setTimeout(()=>{o.stop();}, 80);
       }catch(e){}
     }
-
     function vibrate(){
       try{ navigator.vibrate?.(60); }catch(e){}
     }
@@ -351,7 +366,6 @@
           state = {...state, ...s};
         }
       }catch(e){}
-      // sync UI
       $("sessionName").value = state.sessionName || "";
       roi.value = state.roiPct; lineY.value = state.lineYPct;
       thr.value = Math.round(state.thr*100);
@@ -502,15 +516,19 @@
       updateUI();
     };
 
-    $("btnMode").onclick = ()=>{
+    $("btnMode").onclick = async ()=>{
       state.mode = (state.mode === "B2") ? "B3" : "B2";
       pushEvent("CAMBIO MODO", {note: state.mode});
       autosave();
       updateUI();
+
+      // Si cambias a B3, intenta preparar Roboflow
+      if(state.mode === "B3"){
+        await ensureRoboflowReady();
+      }
     };
 
     $("btnCalib").onclick = ()=>{
-      // Calibration: sets threshold based on baseline motion for 10s (B2 only)
       if(state.mode !== "B2"){
         pushEvent("CALIBRAR", {note:"solo B2"});
         return;
@@ -542,6 +560,10 @@
 
     $("btnCamOn").onclick = async ()=>{
       await startCamera();
+      // Si estás en B3, asegura Roboflow
+      if(state.mode === "B3"){
+        await ensureRoboflowReady();
+      }
     };
     $("btnCamOff").onclick = async ()=>{
       await stopCamera();
@@ -551,8 +573,6 @@
     async function startCamera(){
       try{
         if(stream) await stopCamera();
-
-        // iOS: must be triggered by user gesture (button)
         const constraints = {
           audio:false,
           video:{
@@ -590,19 +610,13 @@
     let lastCountAt = 0;
 
     // For B2 motion
-    let lastFrame = null; // ImageData
+    let lastFrame = null;
     let lastMetric = 0;
 
     // Calibration
     let calibrating = false;
     let calibStart = 0;
     let calibSamples = [];
-
-    // B3 OpenCV
-    let cvReady = false;
-    let bgsub = null;
-    let kernel = null;
-    let lastCross = false;
 
     function ensureCanvas(){
       const w = video.videoWidth || 1280;
@@ -639,10 +653,10 @@
       ctx.strokeStyle = "rgba(50,208,127,.85)";
       ctx.stroke();
 
-      // debug text
+      // debug
       if(state.debug){
         ctx.fillStyle = "rgba(0,0,0,.55)";
-        ctx.fillRect(14, 14, 440, 110);
+        ctx.fillRect(14, 14, 520, 120);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.font = "bold 18px ui-sans-serif, system-ui";
         ctx.fillText(`Modo ${state.mode} • ${state.running ? "RUN" : "PAUSE"}`, 24, 42);
@@ -650,6 +664,7 @@
         ctx.fillText(metricText, 24, 70);
         ctx.font = "14px ui-sans-serif, system-ui";
         ctx.fillText(`thr=${state.thr.toFixed(2)} cool=${state.cooldownMs}ms minArea=${state.minArea}`, 24, 96);
+        ctx.fillText(`RF conf>=${RF_CONFIDENCE} infer=${RF_INFER_MS}ms`, 24, 116);
       }
     }
 
@@ -677,12 +692,10 @@
       if(lastFrame){
         const a = frame.data, b = lastFrame.data;
         let diff = 0;
-        // sample every 8 bytes to be faster
         for(let i=0; i<a.length; i+=8){
-          // grayscale approx using R only (fast)
           diff += Math.abs(a[i] - b[i]);
         }
-        const norm = diff / ( (a.length/8) * 255 ); // 0..1
+        const norm = diff / ( (a.length/8) * 255 );
         lastMetric = norm;
 
         if(calibrating){
@@ -691,7 +704,6 @@
             calibrating = false;
             const base = calibSamples.sort((p,q)=>p-q);
             const p95 = base[Math.floor(base.length*0.95)] || 0.02;
-            // threshold = baseline*2.4 + margin
             const newThr = Math.min(0.30, Math.max(0.06, p95*2.4 + 0.02));
             state.thr = +newThr.toFixed(2);
             thr.value = Math.round(state.thr*100);
@@ -700,7 +712,6 @@
           }
         }
 
-        // gate: count when motion crosses threshold strongly
         if(state.running && norm > state.thr){
           doCount(`B2 motion ${norm.toFixed(2)}`);
         }
@@ -710,119 +721,150 @@
       drawOverlay(`B2 motion=${lastMetric.toFixed(3)} (sube al caer pata)`);
     }
 
-    // --- B3: OpenCV object detection (background subtract + contour + crossing line)
-    function initCVIfNeeded(){
-      if(cvReady) return true;
-      if(typeof cv === "undefined" || !cv.Mat) return false;
+    // ====== B3 Roboflow (detección + tracking + cruce de línea) ======
+    let rfLastInferAt = 0;
+    let tracks = [];
+    let nextTrackId = 1;
 
+    const TRACK_MAX_DIST = 120;      // px para asociar
+    const TRACK_TTL_MS = 1400;       // si no se ve, se borra
+
+    async function ensureRoboflowReady(){
+      if(rfReady || rfLoading) return;
+      rfLoading = true;
       try{
-        bgsub = new cv.BackgroundSubtractorMOG2(300, 16, false);
-        kernel = cv.Mat.ones(5,5, cv.CV_8U);
-        cvReady = true;
-        pushEvent("B3 OpenCV listo");
+        pushEvent("B3 Roboflow", {note:"cargando modelo…"});
+        rfWorkerId = await rfEngine.startWorker(RF_MODEL_SLUG, RF_MODEL_VERSION, RF_PUBLISHABLE_KEY);
+        rfReady = true;
+        pushEvent("B3 Roboflow listo", {note:`${RF_MODEL_SLUG}/${RF_MODEL_VERSION}`});
         autosave();
-        return true;
       }catch(e){
-        pushEvent("B3 OpenCV error", {note:String(e)});
-        return false;
+        pushEvent("B3 Roboflow error", {note:String(e?.message || e)});
+      } finally {
+        rfLoading = false;
       }
     }
 
-    function stepB3(){
-      const ok = initCVIfNeeded();
+    function updateTracks(dets, lineYLocal){
+      const t = performance.now();
+
+      // mark unseen
+      for(const tr of tracks) tr._hit = false;
+
+      for(const d of dets){
+        let best = null, bestDist = Infinity;
+        for(const tr of tracks){
+          const dist = Math.hypot(d.cx - tr.cx, d.cy - tr.cy);
+          if(dist < bestDist && dist < TRACK_MAX_DIST){
+            bestDist = dist; best = tr;
+          }
+        }
+
+        if(best){
+          best._hit = true;
+          best.lastSeen = t;
+          best.prevCy = best.cy;
+          best.cx = d.cx; best.cy = d.cy;
+          best.area = d.area;
+          best.conf = d.conf;
+        }else{
+          tracks.push({
+            id: nextTrackId++,
+            cx: d.cx, cy: d.cy,
+            prevCy: d.cy,
+            lastSeen: t,
+            area: d.area,
+            conf: d.conf,
+            countedAt: 0
+          });
+          tracks[tracks.length-1]._hit = true;
+        }
+      }
+
+      // remove old
+      tracks = tracks.filter(tr => (t - tr.lastSeen) <= TRACK_TTL_MS);
+
+      // count when crossing line (above->below) & not too recent
+      for(const tr of tracks){
+        const wasAbove = tr.prevCy < lineYLocal;
+        const nowBelow = tr.cy >= lineYLocal;
+        const crossed = wasAbove && nowBelow;
+
+        if(crossed && state.running && canCount()){
+          // filtro por área mínima para evitar falsos positivos
+          if(tr.area >= state.minArea){
+            doCount(`B3 RF cross id=${tr.id} conf=${Math.round(tr.conf*100)}%`);
+            tr.countedAt = t;
+          }
+        }
+      }
+    }
+
+    async function stepB3(){
       const {x,y,rw,rh} = getROI();
       const lineYLocal = y + Math.floor(rh*(state.lineYPct/100));
 
-      let metricText = "B3 cargando OpenCV…";
-      if(!ok){
+      let metricText = "B3 Roboflow…";
+
+      if(!rfReady){
+        metricText = "B3 Roboflow cargando…";
         drawOverlay(metricText);
+        // intenta cargar si ya hay cámara
+        if(video.readyState >= 2) await ensureRoboflowReady();
         return;
       }
 
-      // grab frame
-      const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-      const src = cv.matFromImageData(img);
-
-      // ROI crop
-      const rect = new cv.Rect(x,y,rw,rh);
-      const roiMat = src.roi(rect);
-
-      // bg subtraction
-      const fg = new cv.Mat();
-      bgsub.apply(roiMat, fg);
-
-      // cleanup
-      cv.medianBlur(fg, fg, 5);
-      cv.threshold(fg, fg, 200, 255, cv.THRESH_BINARY);
-      cv.morphologyEx(fg, fg, cv.MORPH_OPEN, kernel);
-
-      // contours
-      const contours = new cv.MatVector();
-      const hierarchy = new cv.Mat();
-      cv.findContours(fg, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-      let best = null;
-      let bestArea = 0;
-
-      for(let i=0;i<contours.size();i++){
-        const c = contours.get(i);
-        const area = cv.contourArea(c);
-        if(area > bestArea){
-          bestArea = area;
-          best = c;
-        }
+      // throttle
+      const now = performance.now();
+      if(now - rfLastInferAt < RF_INFER_MS){
+        drawOverlay("B3 Roboflow (esperando inferencia)...");
+        return;
       }
+      rfLastInferAt = now;
 
-      // draw ROI preview / detection
-      // First, clear and redraw video
-      // (ctx already has video frame)
-      ctx.save();
-      // draw detection bbox if any
-      let crossed = false;
+      try{
+        const img = new CVImage(video);
+        const result = await rfEngine.infer(rfWorkerId, img);
 
-      if(best && bestArea >= state.minArea){
-        const r = cv.boundingRect(best);
-        // bbox global coords
-        const gx = x + r.x;
-        const gy = y + r.y;
-        const gw = r.width;
-        const gh = r.height;
+        const preds = (result?.predictions || [])
+          .filter(p => (String(p.class||"").toLowerCase().includes("pata")))
+          .filter(p => (p.confidence ?? 0) >= RF_CONFIDENCE)
+          .map(p => {
+            const bb = p.bbox || {};
+            const cx = bb.x ?? 0, cy = bb.y ?? 0, w = bb.width ?? 0, h = bb.height ?? 0;
+            const area = Math.max(0, w*h);
+            const bx = cx - w/2, by = cy - h/2;
+            return { conf: (p.confidence ?? 0), cx, cy, w, h, area, bx, by };
+          })
+          // opcional: solo detecciones dentro del ROI (centro dentro)
+          .filter(d => d.cx >= x && d.cx <= x+rw && d.cy >= y && d.cy <= y+rh);
 
-        // centroid global
-        const cx = gx + gw/2;
-        const cy = gy + gh/2;
+        // dibuja detecciones
+        for(const d of preds){
+          // área mínima también aquí
+          if(d.area < state.minArea) continue;
 
-        // Draw bbox
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = "rgba(202,162,74,.95)";
-        ctx.strokeRect(gx,gy,gw,gh);
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = "rgba(168,85,247,.95)";
+          ctx.strokeRect(d.bx, d.by, d.w, d.h);
 
-        // centroid
-        ctx.beginPath();
-        ctx.arc(cx,cy,8,0,Math.PI*2);
-        ctx.fillStyle = "rgba(202,162,74,.95)";
-        ctx.fill();
-
-        // crossing logic: count when centroid goes below the line (inside ROI)
-        const nowBelow = (cy >= lineYLocal);
-        crossed = (!lastCross && nowBelow); // transition: above -> below
-        lastCross = nowBelow;
-
-        metricText = `B3 area=${Math.round(bestArea)} centroidY=${Math.round(cy)} lineY=${lineYLocal}`;
-        if(state.running && crossed){
-          doCount(`B3 cross area=${Math.round(bestArea)}`);
+          ctx.fillStyle = "rgba(0,0,0,.45)";
+          ctx.fillRect(d.bx, Math.max(0, d.by-26), 170, 26);
+          ctx.fillStyle = "rgba(255,255,255,.92)";
+          ctx.font = "bold 16px ui-sans-serif, system-ui";
+          ctx.fillText(`pata ${Math.round(d.conf*100)}%`, d.bx+8, Math.max(18, d.by-8));
         }
-      }else{
-        metricText = `B3 sin objeto (bestArea=${Math.round(bestArea)})`;
-        lastCross = false;
-      }
 
-      // cleanup mats
-      src.delete(); roiMat.delete(); fg.delete(); contours.delete(); hierarchy.delete();
-      if(best && best.delete) { /* contour will be freed by MatVector delete */ }
+        // tracking + crossing
+        const detsForTrack = preds.filter(d => d.area >= state.minArea);
+        updateTracks(detsForTrack, lineYLocal);
+
+        metricText = `B3 RF dets=${detsForTrack.length} tracks=${tracks.length}`;
+      } catch(e){
+        metricText = `B3 RF error: ${String(e?.message || e)}`;
+      }
 
       drawOverlay(metricText);
-      ctx.restore();
     }
 
     // ====== Main Loop ======
@@ -830,14 +872,11 @@
       requestAnimationFrame(loop);
 
       if(!video || video.readyState < 2) {
-        // still update clock
         clockEl.textContent = new Date().toLocaleTimeString();
         return;
       }
 
       ensureCanvas();
-
-      // draw current video frame
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       if(state.mode === "B2") stepB2();
@@ -850,10 +889,11 @@
     load();
     loop();
 
-    // Safety: keep autosaving timer (in case user doesn’t touch)
+    // autosave
     setInterval(()=>{ autosave(); }, 15000);
   </script>
 </body>
 </html>
+
 
 
