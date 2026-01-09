@@ -132,7 +132,7 @@
   <div class="topbar">
     <div class="pill"><span class="dot"></span>ONLINE</div>
     <div>
-      <h1>VDC LA RIATA Contador de Patas</h1>
+      <h1>VDC Contador de Patas</h1>
       <div class="sub">B2 (movimiento) + B3 (OpenCV) + RF (Roboflow IA real). Guardado local.</div>
     </div>
   </div>
@@ -573,3 +573,413 @@
         if(stream) await stopCamera();
         const constraints = {
           audio:false,
+          video:{
+            facingMode: state.camera.facingMode,
+            width: { ideal: 1280 },
+            height:{ ideal: 720 }
+          }
+        };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        await video.play();
+
+        pushEvent("CAMARA_ON");
+        autosave();
+
+        if(state.mode === "RF") ensureRFWorker();
+      }catch(err){
+        pushEvent("CAMARA_ERROR", {note: String(err?.message || err)});
+        alert("No se pudo activar cámara. Revisa permisos de Safari → Cámara → Permitir.");
+      }
+    }
+
+    async function stopCamera(){
+      try{
+        if(video.srcObject){
+          video.pause();
+          video.srcObject = null;
+        }
+        if(stream){
+          stream.getTracks().forEach(t=>t.stop());
+          stream = null;
+        }
+      }catch(e){}
+    }
+
+    // ====== Vision Helpers ======
+    let lastCountAt = 0;
+    function canCount(){
+      const now = performance.now();
+      return (now - lastCountAt) > state.cooldownMs;
+    }
+    function doCount(note="auto"){
+      if(!state.running) return;
+      if(!canCount()) return;
+
+      state.count += 1;
+      lastCountAt = performance.now();
+      autosave();
+      updateUI();
+      countedVisual(note);
+    }
+
+    function ensureCanvas(){
+      const w = video.videoWidth || 1280;
+      const h = video.videoHeight || 720;
+      if(canvas.width !== w || canvas.height !== h){
+        canvas.width = w;
+        canvas.height = h;
+      }
+    }
+
+    function getROI(){
+      const w = canvas.width, h = canvas.height;
+      const pct = state.roiPct/100;
+      const rw = Math.floor(w*pct);
+      const rh = Math.floor(h*pct);
+      const x = Math.floor((w - rw)/2);
+      const y = Math.floor((h - rh)/2);
+      return {x,y,rw,rh};
+    }
+
+    function drawOverlay(metricText=""){
+      const {x,y,rw,rh} = getROI();
+      const lineYLocal = y + Math.floor(rh*(state.lineYPct/100));
+
+      // ROI
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(74,163,255,.75)";
+      ctx.strokeRect(x,y,rw,rh);
+
+      // line
+      ctx.beginPath();
+      ctx.moveTo(x, lineYLocal);
+      ctx.lineTo(x+rw, lineYLocal);
+      ctx.strokeStyle = "rgba(50,208,127,.85)";
+      ctx.stroke();
+
+      if(state.debug){
+        ctx.fillStyle = "rgba(0,0,0,.55)";
+        ctx.fillRect(14, 14, 560, 120);
+        ctx.fillStyle = "rgba(255,255,255,.92)";
+        ctx.font = "bold 18px ui-sans-serif, system-ui";
+        ctx.fillText(`Modo ${state.mode} • ${state.running ? "RUN" : "PAUSE"}`, 24, 42);
+        ctx.font = "bold 16px ui-sans-serif, system-ui";
+        ctx.fillText(metricText, 24, 70);
+        ctx.font = "14px ui-sans-serif, system-ui";
+        ctx.fillText(`thr=${state.thr.toFixed(2)} cool=${state.cooldownMs}ms RFconf=${state.rfConf.toFixed(2)} RFfps=${state.rfFps}`, 24, 96);
+      }
+    }
+
+    // ======================
+    // B2: motion metric
+    // ======================
+    let lastFrame = null;
+    let lastMetric = 0;
+    let calibrating = false;
+    let calibStart = 0;
+    let calibSamples = [];
+
+    $("btnCalib").onclick = ()=>{
+      if(state.mode !== "B2"){
+        pushEvent("CALIBRAR", {note:"solo B2"});
+        return;
+      }
+      calibrating = true;
+      calibStart = performance.now();
+      calibSamples = [];
+      pushEvent("CALIBRAR", {note:"10s"});
+    };
+
+    function stepB2(){
+      const {x,y,rw,rh} = getROI();
+      const frame = ctx.getImageData(x,y,rw,rh);
+
+      if(lastFrame){
+        const a = frame.data, b = lastFrame.data;
+        let diff = 0;
+        for(let i=0; i<a.length; i+=8){
+          diff += Math.abs(a[i] - b[i]);
+        }
+        const norm = diff / ( (a.length/8) * 255 );
+        lastMetric = norm;
+
+        if(calibrating){
+          calibSamples.push(norm);
+          if(performance.now() - calibStart > 10000){
+            calibrating = false;
+            const base = calibSamples.sort((p,q)=>p-q);
+            const p95 = base[Math.floor(base.length*0.95)] || 0.02;
+            const newThr = Math.min(0.30, Math.max(0.06, p95*2.4 + 0.02));
+            state.thr = +newThr.toFixed(2);
+            thr.value = Math.round(state.thr*100);
+            pushEvent("CALIBRAR OK", {note:`thr=${state.thr.toFixed(2)}`});
+            autosave(); updateUI();
+          }
+        }
+
+        if(state.running && norm > state.thr){
+          doCount(`B2 motion ${norm.toFixed(2)}`);
+        }
+      }
+
+      lastFrame = frame;
+      drawOverlay(`B2 motion=${lastMetric.toFixed(3)} (ojo: sombras cuentan)`);
+    }
+
+    // ======================
+    // B3: OpenCV
+    // ======================
+    let cvReady = false;
+    let bgsub = null;
+    let kernel = null;
+    let lastCross = false;
+
+    function initCVIfNeeded(){
+      if(cvReady) return true;
+      if(typeof cv === "undefined" || !cv.Mat) return false;
+
+      try{
+        bgsub = new cv.BackgroundSubtractorMOG2(300, 16, false);
+        kernel = cv.Mat.ones(5,5, cv.CV_8U);
+        cvReady = true;
+        pushEvent("B3 OpenCV listo");
+        autosave();
+        return true;
+      }catch(e){
+        pushEvent("B3 OpenCV error", {note:String(e)});
+        return false;
+      }
+    }
+
+    function stepB3(){
+      const ok = initCVIfNeeded();
+      const {x,y,rw,rh} = getROI();
+      const lineYLocal = y + Math.floor(rh*(state.lineYPct/100));
+      let metricText = "B3 cargando OpenCV…";
+      if(!ok){
+        drawOverlay(metricText);
+        return;
+      }
+
+      const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+      const src = cv.matFromImageData(img);
+
+      const rect = new cv.Rect(x,y,rw,rh);
+      const roiMat = src.roi(rect);
+
+      const fg = new cv.Mat();
+      bgsub.apply(roiMat, fg);
+
+      cv.medianBlur(fg, fg, 5);
+      cv.threshold(fg, fg, 200, 255, cv.THRESH_BINARY);
+      cv.morphologyEx(fg, fg, cv.MORPH_OPEN, kernel);
+
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+      cv.findContours(fg, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      let best = null;
+      let bestArea = 0;
+      for(let i=0;i<contours.size();i++){
+        const c = contours.get(i);
+        const area = cv.contourArea(c);
+        if(area > bestArea){ bestArea = area; best = c; }
+      }
+
+      if(best && bestArea >= state.minArea){
+        const r = cv.boundingRect(best);
+        const gx = x + r.x, gy = y + r.y, gw = r.width, gh = r.height;
+        const cx = gx + gw/2, cy = gy + gh/2;
+
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(202,162,74,.95)";
+        ctx.strokeRect(gx,gy,gw,gh);
+        ctx.beginPath(); ctx.arc(cx,cy,8,0,Math.PI*2);
+        ctx.fillStyle = "rgba(202,162,74,.95)"; ctx.fill();
+
+        const nowBelow = (cy >= lineYLocal);
+        const crossed = (!lastCross && nowBelow);
+        lastCross = nowBelow;
+
+        metricText = `B3 area=${Math.round(bestArea)} cy=${Math.round(cy)} lineY=${lineYLocal}`;
+        if(state.running && crossed){
+          doCount(`B3 cross area=${Math.round(bestArea)}`);
+        }
+      }else{
+        metricText = `B3 sin objeto (bestArea=${Math.round(bestArea)})`;
+        lastCross = false;
+      }
+
+      src.delete(); roiMat.delete(); fg.delete(); contours.delete(); hierarchy.delete();
+      drawOverlay(metricText);
+    }
+
+    // ======================
+    // RF: Roboflow (inferencejs)
+    // ======================
+    let rfEngine = null;
+    let rfWorkerId = null;
+    let rfInFlight = false;
+    let rfLastInferAt = 0;
+    let rfLastBelow = false;
+
+    // Offscreen canvas para recortar ROI (mejor que mandar frame completo)
+    const roiCanvas = document.createElement("canvas");
+    const roiCtx = roiCanvas.getContext("2d");
+
+    async function ensureRFWorker(){
+      try{
+        if(!window.InferenceEngine){
+          pushEvent("RF error", {note:"inferencejs no cargó"});
+          return;
+        }
+        if(rfWorkerId) return;
+
+        rfEngine = rfEngine || new window.InferenceEngine();
+        const config = {
+          scoreThreshold: state.rfConf,
+          iouThreshold: 0.5,
+          maxNumBoxes: 20
+        };
+        pushEvent("RF cargando modelo…", {note:`${MODEL_NAME}/${MODEL_VERSION}`});
+        rfWorkerId = await rfEngine.startWorker(MODEL_NAME, MODEL_VERSION, PUBLISHABLE_KEY, config);
+        pushEvent("RF listo");
+      }catch(e){
+        pushEvent("RF startWorker error", {note:String(e?.message || e)});
+      }
+    }
+
+    function rfShouldInfer(){
+      const now = performance.now();
+      const interval = 1000 / Math.max(1, state.rfFps);
+      return (now - rfLastInferAt) >= interval;
+    }
+
+    async function stepRF(){
+      let metricText = "RF esperando…";
+      await ensureRFWorker();
+
+      if(!rfWorkerId){
+        drawOverlay("RF no inicializado (revisa key/model)");
+        return;
+      }
+
+      // throttle + no overlap
+      if(rfInFlight || !rfShouldInfer()){
+        drawOverlay("RF throttling…");
+        return;
+      }
+
+      const {x,y,rw,rh} = getROI();
+      const lineYLocal = y + Math.floor(rh*(state.lineYPct/100));
+
+      // recorta ROI del frame actual a un canvas chico
+      roiCanvas.width = rw;
+      roiCanvas.height = rh;
+      roiCtx.drawImage(canvas, x, y, rw, rh, 0, 0, rw, rh);
+
+      rfInFlight = true;
+      rfLastInferAt = performance.now();
+      try{
+        // usa configuración por infer también (por si cambias sliders en vivo)
+        const inferConfig = {
+          scoreThreshold: state.rfConf,
+          iouThreshold: 0.5,
+          maxNumBoxes: 20
+        };
+
+        const preds = await rfEngine.infer(rfWorkerId, roiCanvas, inferConfig);
+
+        // Dibuja detecciones y toma la mejor "pata"
+        let best = null;
+        let bestScore = 0;
+
+        if(Array.isArray(preds)){
+          for(const p of preds){
+            const cls = (p.class || p.label || "").toString().toLowerCase();
+            const conf = Number(p.confidence ?? p.score ?? 0);
+            // Filtra solo clase "pata" si viene así
+            if(cls && !cls.includes("pata")) continue;
+            if(conf > bestScore){
+              bestScore = conf;
+              best = p;
+            }
+          }
+        }
+
+        if(best){
+          // inferencejs suele dar x,y,width,height en coords del ROI
+          const bx = Number(best.x ?? 0);
+          const by = Number(best.y ?? 0);
+          const bw = Number(best.width ?? 0);
+          const bh = Number(best.height ?? 0);
+
+          // Convertir a coords globales: centro-> esquina
+          const gx = x + (bx - bw/2);
+          const gy = y + (by - bh/2);
+
+          // bbox
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = "rgba(202,162,74,.95)";
+          ctx.strokeRect(gx, gy, bw, bh);
+
+          // centroid global
+          const cx = gx + bw/2;
+          const cy = gy + bh/2;
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, 8, 0, Math.PI*2);
+          ctx.fillStyle = "rgba(202,162,74,.95)";
+          ctx.fill();
+
+          // Cruce de línea: arriba -> abajo
+          const nowBelow = (cy >= lineYLocal);
+          const crossed = (!rfLastBelow && nowBelow);
+          rfLastBelow = nowBelow;
+
+          metricText = `RF best=${(best.class||best.label||"pata")} conf=${bestScore.toFixed(2)} cy=${Math.round(cy)} lineY=${lineYLocal}`;
+
+          if(state.running && crossed){
+            doCount(`RF cross conf=${bestScore.toFixed(2)}`);
+          }
+        }else{
+          rfLastBelow = false;
+          metricText = `RF sin detección (conf≥${state.rfConf.toFixed(2)})`;
+        }
+
+        drawOverlay(metricText);
+      }catch(e){
+        drawOverlay("RF infer error (ver bitácora)");
+        pushEvent("RF infer error", {note:String(e?.message || e)});
+      }finally{
+        rfInFlight = false;
+      }
+    }
+
+    // ====== Main Loop ======
+    function loop(){
+      requestAnimationFrame(loop);
+
+      if(!video || video.readyState < 2) {
+        clockEl.textContent = new Date().toLocaleTimeString();
+        return;
+      }
+
+      ensureCanvas();
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      if(state.mode === "B2") stepB2();
+      else if(state.mode === "B3") stepB3();
+      else stepRF(); // RF
+
+      clockEl.textContent = new Date().toLocaleTimeString();
+    }
+
+    // ====== Boot ======
+    load();
+    loop();
+    setInterval(()=>{ autosave(); }, 15000);
+  </script>
+</body>
+</html>
