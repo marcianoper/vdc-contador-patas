@@ -197,6 +197,7 @@
             <button class="btn small blue" id="btnMode">CAMBIAR B2/B3/RF</button>
             <button class="btn small" id="btnDebug">DEBUG</button>
             <button class="btn small" id="btnCalib">CALIBRAR (10s)</button>
+            <button class="btn small" id="btnRFReset">RF RESET</button>
           </div>
 
           <div class="mini">
@@ -302,13 +303,11 @@
 
   <script>
     // ======================
-    //  CONFIG ROBLOW (RF)
+    //  CONFIG ROBOFLOW (RF)
     // ======================
     const PUBLISHABLE_KEY = "rf_cZVpt4nSGwabGVW3Fr0rzawLieC2";
 
     // Según tu captura: marcianoper/vdc-patas-instant-4
-    // inferencejs necesita (name, version). Dependiendo cómo quedó guardado en Roboflow,
-    // la versión puede estar en 1 y el "-4" ser parte del nombre, o al revés.
     const MODEL_CANDIDATES = [
       { name: "vdc-patas-instant-4", version: 1 },
       { name: "vdc-patas-instant", version: 4 },
@@ -426,7 +425,7 @@
         ...extra
       };
       state.events.unshift(ev);
-      state.events = state.events.slice(0, 160);
+      state.events = state.events.slice(0, 200);
       autosave();
       renderLog();
     }
@@ -540,14 +539,6 @@
       updateUI();
     };
 
-    $("btnMode").onclick = ()=>{
-      state.mode = (state.mode === "B2") ? "B3" : (state.mode === "B3" ? "RF" : "B2");
-      pushEvent("CAMBIO MODO", {note: state.mode});
-      autosave();
-      updateUI();
-      if(state.mode === "RF") ensureRFWorker();
-    };
-
     // sliders bindings
     roi.oninput = ()=>{ state.roiPct = +roi.value; autosave(); updateUI(); };
     lineY.oninput = ()=>{ state.lineYPct = +lineY.value; autosave(); updateUI(); };
@@ -590,7 +581,10 @@
         pushEvent("CAMARA_ON");
         autosave();
 
-        if(state.mode === "RF") ensureRFWorker();
+        if(state.mode === "RF"){
+          await rfResetInternal();
+          await ensureRFWorker();
+        }
       }catch(err){
         pushEvent("CAMARA_ERROR", {note: String(err?.message || err)});
         alert("No se pudo activar cámara. Revisa permisos de Safari → Cámara → Permitir.");
@@ -650,12 +644,10 @@
       const {x,y,rw,rh} = getROI();
       const lineYLocal = y + Math.floor(rh*(state.lineYPct/100));
 
-      // ROI
       ctx.lineWidth = 4;
       ctx.strokeStyle = "rgba(74,163,255,.75)";
       ctx.strokeRect(x,y,rw,rh);
 
-      // line
       ctx.beginPath();
       ctx.moveTo(x, lineYLocal);
       ctx.lineTo(x+rw, lineYLocal);
@@ -664,7 +656,7 @@
 
       if(state.debug){
         ctx.fillStyle = "rgba(0,0,0,.55)";
-        ctx.fillRect(14, 14, 720, 120);
+        ctx.fillRect(14, 14, 760, 120);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.font = "bold 18px ui-sans-serif, system-ui";
         ctx.fillText(`Modo ${state.mode} • ${state.running ? "RUN" : "PAUSE"}`, 24, 42);
@@ -820,7 +812,7 @@
     }
 
     // ======================
-    // RF: Roboflow (inferencejs)
+    // RF: Roboflow (inferencejs) — BLINDADO
     // ======================
     let rfEngine = null;
     let rfWorkerId = null;
@@ -828,34 +820,71 @@
     let rfLastInferAt = 0;
     let rfLastBelow = false;
 
+    let rfStarting = false;
+    let rfFailed = false;
+    let rfWorkerIds = [];
+
     const roiCanvas = document.createElement("canvas");
     const roiCtx = roiCanvas.getContext("2d");
 
     function getRFExports(){
       const lib = window.inferencejs ?? window;
       return {
-        InferenceEngine: lib.InferenceEngine ?? window.InferenceEngine,
-        CVImage: lib.CVImage ?? window.CVImage
+        InferenceEngine: lib.InferenceEngine ?? window.InferenceEngine
       };
     }
 
+    async function rfResetInternal(){
+      try{
+        if(rfEngine){
+          for(const id of rfWorkerIds){
+            try{ await rfEngine.stopWorker(id); }catch(e){}
+          }
+        }
+      }catch(e){}
+      rfWorkerIds = [];
+      rfWorkerId = null;
+      rfStarting = false;
+      rfFailed = false;
+      pushEvent("RF cleanup", {note:"workers cerrados"});
+      autosave();
+    }
+
+    $("btnRFReset").onclick = async ()=>{
+      await rfResetInternal();
+      if(state.mode === "RF"){
+        await ensureRFWorker();
+      }
+    };
+
     async function ensureRFWorker(){
+      if(rfWorkerId) return;
+      if(rfStarting) return;
+      if(rfFailed) return;
+
+      rfStarting = true;
+
       try{
         const { InferenceEngine } = getRFExports();
         pushEvent("RF LIB", {note:`InferenceEngine=${!!InferenceEngine}`});
 
         if(!InferenceEngine){
+          rfFailed = true;
           pushEvent("RF error", {note:"InferenceEngine no existe. inferencejs no cargó/bloqueado."});
           return;
         }
-        if(rfWorkerId) return;
 
         rfEngine = rfEngine || new InferenceEngine();
+
+        // Limpia antes de intentar
+        await rfResetInternal();
 
         for(const c of MODEL_CANDIDATES){
           try{
             pushEvent("RF probando modelo…", {note:`${c.name}/${c.version}`});
-            rfWorkerId = await rfEngine.startWorker(c.name, c.version, PUBLISHABLE_KEY);
+            const id = await rfEngine.startWorker(c.name, c.version, PUBLISHABLE_KEY);
+            rfWorkerId = id;
+            rfWorkerIds.push(id);
             pushEvent("RF listo", {note:`OK: ${c.name}/${c.version}`});
             autosave();
             return;
@@ -864,9 +893,13 @@
           }
         }
 
+        rfFailed = true;
         pushEvent("RF error", {note:"No se pudo iniciar el worker con ningún candidato."});
       }catch(e){
+        rfFailed = true;
         pushEvent("RF startWorker error", {note:String(e?.message || e)});
+      }finally{
+        rfStarting = false;
       }
     }
 
@@ -878,10 +911,12 @@
 
     async function stepRF(){
       await ensureRFWorker();
-      if(!rfWorkerId || !rfEngine){
-        drawOverlay("RF no inicializado (revisa bitácora)");
+
+      if(!rfWorkerId){
+        drawOverlay(rfFailed ? "RF falló (toca RF RESET o recarga la página)" : "RF iniciando…");
         return;
       }
+
       if(rfInFlight || !rfShouldInfer()){
         drawOverlay("RF throttling…");
         return;
@@ -907,10 +942,7 @@
           for(const p of preds){
             const conf = Number(p.confidence ?? p.score ?? 0);
 
-            // TEMP: sin filtro de clase para depurar
-            // const cls = (p.class || p.label || "").toString().toLowerCase();
-            // if(cls && !cls.includes("pata")) continue;
-
+            // TEMP sin filtro de clase (ya que tu modelo detecta, luego filtramos por "pata")
             if(conf > bestScore){
               bestScore = conf;
               best = p;
@@ -921,13 +953,11 @@
         if(best){
           const bb = best.bbox || best.bounding_box || best.box || null;
 
-          // algunos devuelven bbox anidado, otros top-level
           const bx = Number(bb?.x ?? best.x ?? 0);
           const by = Number(bb?.y ?? best.y ?? 0);
           const bw = Number(bb?.width ?? best.width ?? 0);
           const bh = Number(bb?.height ?? best.height ?? 0);
 
-          // centro -> esquina
           const gx = x + (bx - bw/2);
           const gy = y + (by - bh/2);
 
@@ -964,6 +994,19 @@
       }
     }
 
+    // ====== Modo / Botones ======
+    $("btnMode").onclick = async ()=>{
+      state.mode = (state.mode === "B2") ? "B3" : (state.mode === "B3" ? "RF" : "B2");
+      pushEvent("CAMBIO MODO", {note: state.mode});
+      autosave();
+      updateUI();
+
+      if(state.mode === "RF"){
+        await rfResetInternal();
+        await ensureRFWorker();
+      }
+    };
+
     // ====== Main Loop ======
     function loop(){
       requestAnimationFrame(loop);
@@ -990,3 +1033,4 @@
   </script>
 </body>
 </html>
+
