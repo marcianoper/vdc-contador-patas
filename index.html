@@ -121,9 +121,8 @@
   <!-- OpenCV (solo B3) -->
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
-  <!-- Roboflow inferencejs (modo RF) -->
+  <!-- Roboflow inferencejs (RF) -->
   <script src="https://cdn.jsdelivr.net/npm/inferencejs"></script>
-  <!-- Nota: Roboflow recomienda usar publishable_key (no private key). -->
 </head>
 
 <body>
@@ -170,7 +169,7 @@
       </div>
 
       <div class="mini">
-        Tip: iPhone fijo en tripié apuntando al tanque. En RF cuenta por IA “pata”.
+        Tip: iPhone fijo en tripié apuntando al tanque. En RF cuenta por IA.
       </div>
 
       <div class="hr"></div>
@@ -267,8 +266,8 @@
           </div>
 
           <div class="mini">
-            Recomendado RF: confianza 0.55–0.75 y FPS 2–4.<br/>
-            Si cuenta doble: sube cooldown. Si no detecta: baja confianza o ajusta ROI.
+            Recomendado RF: confianza 0.45–0.70 y FPS 2–4.<br/>
+            Si no detecta: baja confianza y ajusta ROI.
           </div>
         </div>
       </div>
@@ -305,10 +304,16 @@
     // ======================
     //  CONFIG ROBLOW (RF)
     // ======================
-    // Usa PUBLISHABLE KEY (no private key). Roboflow lo indica en docs. :contentReference[oaicite:1]{index=1}
-    const PUBLISHABLE_KEY = "rf_cZVpt4nSGwabGVW3Fr0rzawLieC2"; // <-- TU publishable (ok en navegador)
-    const MODEL_NAME = "vdc-patas";  // <-- si tu proyecto se llama diferente, cámbialo
-    const MODEL_VERSION = 2;         // <-- versión (vdc-patas/2)
+    const PUBLISHABLE_KEY = "rf_cZVpt4nSGwabGVW3Fr0rzawLieC2";
+
+    // Según tu captura: marcianoper/vdc-patas-instant-4
+    // inferencejs necesita (name, version). Dependiendo cómo quedó guardado en Roboflow,
+    // la versión puede estar en 1 y el "-4" ser parte del nombre, o al revés.
+    const MODEL_CANDIDATES = [
+      { name: "vdc-patas-instant-4", version: 1 },
+      { name: "vdc-patas-instant", version: 4 },
+      { name: "vdc-patas", version: 2 }
+    ];
 
     // ====== Estado ======
     const LS_KEY = "vdc_patas_state_v4";
@@ -421,7 +426,7 @@
         ...extra
       };
       state.events.unshift(ev);
-      state.events = state.events.slice(0, 120);
+      state.events = state.events.slice(0, 160);
       autosave();
       renderLog();
     }
@@ -540,7 +545,6 @@
       pushEvent("CAMBIO MODO", {note: state.mode});
       autosave();
       updateUI();
-      // cuando entres a RF, intenta iniciar worker si no existe
       if(state.mode === "RF") ensureRFWorker();
     };
 
@@ -660,7 +664,7 @@
 
       if(state.debug){
         ctx.fillStyle = "rgba(0,0,0,.55)";
-        ctx.fillRect(14, 14, 560, 120);
+        ctx.fillRect(14, 14, 720, 120);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.font = "bold 18px ui-sans-serif, system-ui";
         ctx.fillText(`Modo ${state.mode} • ${state.running ? "RUN" : "PAUSE"}`, 24, 42);
@@ -824,27 +828,43 @@
     let rfLastInferAt = 0;
     let rfLastBelow = false;
 
-    // Offscreen canvas para recortar ROI (mejor que mandar frame completo)
     const roiCanvas = document.createElement("canvas");
     const roiCtx = roiCanvas.getContext("2d");
 
+    function getRFExports(){
+      const lib = window.inferencejs ?? window;
+      return {
+        InferenceEngine: lib.InferenceEngine ?? window.InferenceEngine,
+        CVImage: lib.CVImage ?? window.CVImage
+      };
+    }
+
     async function ensureRFWorker(){
       try{
-        if(!window.InferenceEngine){
-          pushEvent("RF error", {note:"inferencejs no cargó"});
+        const { InferenceEngine } = getRFExports();
+        pushEvent("RF LIB", {note:`InferenceEngine=${!!InferenceEngine}`});
+
+        if(!InferenceEngine){
+          pushEvent("RF error", {note:"InferenceEngine no existe. inferencejs no cargó/bloqueado."});
           return;
         }
         if(rfWorkerId) return;
 
-        rfEngine = rfEngine || new window.InferenceEngine();
-        const config = {
-          scoreThreshold: state.rfConf,
-          iouThreshold: 0.5,
-          maxNumBoxes: 20
-        };
-        pushEvent("RF cargando modelo…", {note:`${MODEL_NAME}/${MODEL_VERSION}`});
-        rfWorkerId = await rfEngine.startWorker(MODEL_NAME, MODEL_VERSION, PUBLISHABLE_KEY, config);
-        pushEvent("RF listo");
+        rfEngine = rfEngine || new InferenceEngine();
+
+        for(const c of MODEL_CANDIDATES){
+          try{
+            pushEvent("RF probando modelo…", {note:`${c.name}/${c.version}`});
+            rfWorkerId = await rfEngine.startWorker(c.name, c.version, PUBLISHABLE_KEY);
+            pushEvent("RF listo", {note:`OK: ${c.name}/${c.version}`});
+            autosave();
+            return;
+          }catch(eTry){
+            pushEvent("RF fallo modelo", {note:`${c.name}/${c.version} -> ${String(eTry?.message || eTry)}`});
+          }
+        }
+
+        pushEvent("RF error", {note:"No se pudo iniciar el worker con ningún candidato."});
       }catch(e){
         pushEvent("RF startWorker error", {note:String(e?.message || e)});
       }
@@ -857,15 +877,11 @@
     }
 
     async function stepRF(){
-      let metricText = "RF esperando…";
       await ensureRFWorker();
-
-      if(!rfWorkerId){
-        drawOverlay("RF no inicializado (revisa key/model)");
+      if(!rfWorkerId || !rfEngine){
+        drawOverlay("RF no inicializado (revisa bitácora)");
         return;
       }
-
-      // throttle + no overlap
       if(rfInFlight || !rfShouldInfer()){
         drawOverlay("RF throttling…");
         return;
@@ -874,33 +890,27 @@
       const {x,y,rw,rh} = getROI();
       const lineYLocal = y + Math.floor(rh*(state.lineYPct/100));
 
-      // recorta ROI del frame actual a un canvas chico
       roiCanvas.width = rw;
       roiCanvas.height = rh;
       roiCtx.drawImage(canvas, x, y, rw, rh, 0, 0, rw, rh);
 
       rfInFlight = true;
       rfLastInferAt = performance.now();
+
       try{
-        // usa configuración por infer también (por si cambias sliders en vivo)
-        const inferConfig = {
-          scoreThreshold: state.rfConf,
-          iouThreshold: 0.5,
-          maxNumBoxes: 20
-        };
+        const preds = await rfEngine.infer(rfWorkerId, roiCanvas);
 
-        const preds = await rfEngine.infer(rfWorkerId, roiCanvas, inferConfig);
-
-        // Dibuja detecciones y toma la mejor "pata"
         let best = null;
         let bestScore = 0;
 
         if(Array.isArray(preds)){
           for(const p of preds){
-            const cls = (p.class || p.label || "").toString().toLowerCase();
             const conf = Number(p.confidence ?? p.score ?? 0);
-            // Filtra solo clase "pata" si viene así
-            if(cls && !cls.includes("pata")) continue;
+
+            // TEMP: sin filtro de clase para depurar
+            // const cls = (p.class || p.label || "").toString().toLowerCase();
+            // if(cls && !cls.includes("pata")) continue;
+
             if(conf > bestScore){
               bestScore = conf;
               best = p;
@@ -909,22 +919,22 @@
         }
 
         if(best){
-          // inferencejs suele dar x,y,width,height en coords del ROI
-          const bx = Number(best.x ?? 0);
-          const by = Number(best.y ?? 0);
-          const bw = Number(best.width ?? 0);
-          const bh = Number(best.height ?? 0);
+          const bb = best.bbox || best.bounding_box || best.box || null;
 
-          // Convertir a coords globales: centro-> esquina
+          // algunos devuelven bbox anidado, otros top-level
+          const bx = Number(bb?.x ?? best.x ?? 0);
+          const by = Number(bb?.y ?? best.y ?? 0);
+          const bw = Number(bb?.width ?? best.width ?? 0);
+          const bh = Number(bb?.height ?? best.height ?? 0);
+
+          // centro -> esquina
           const gx = x + (bx - bw/2);
           const gy = y + (by - bh/2);
 
-          // bbox
           ctx.lineWidth = 4;
           ctx.strokeStyle = "rgba(202,162,74,.95)";
           ctx.strokeRect(gx, gy, bw, bh);
 
-          // centroid global
           const cx = gx + bw/2;
           const cy = gy + bh/2;
 
@@ -933,25 +943,22 @@
           ctx.fillStyle = "rgba(202,162,74,.95)";
           ctx.fill();
 
-          // Cruce de línea: arriba -> abajo
           const nowBelow = (cy >= lineYLocal);
           const crossed = (!rfLastBelow && nowBelow);
           rfLastBelow = nowBelow;
 
-          metricText = `RF best=${(best.class||best.label||"pata")} conf=${bestScore.toFixed(2)} cy=${Math.round(cy)} lineY=${lineYLocal}`;
+          drawOverlay(`RF conf=${bestScore.toFixed(2)} cy=${Math.round(cy)} lineY=${lineYLocal} preds=${preds?.length||0}`);
 
-          if(state.running && crossed){
+          if(bestScore >= state.rfConf && state.running && crossed){
             doCount(`RF cross conf=${bestScore.toFixed(2)}`);
           }
         }else{
           rfLastBelow = false;
-          metricText = `RF sin detección (conf≥${state.rfConf.toFixed(2)})`;
+          drawOverlay(`RF sin detección (conf≥${state.rfConf.toFixed(2)})`);
         }
-
-        drawOverlay(metricText);
       }catch(e){
-        drawOverlay("RF infer error (ver bitácora)");
         pushEvent("RF infer error", {note:String(e?.message || e)});
+        drawOverlay("RF infer error (ver bitácora)");
       }finally{
         rfInFlight = false;
       }
@@ -971,7 +978,7 @@
 
       if(state.mode === "B2") stepB2();
       else if(state.mode === "B3") stepB3();
-      else stepRF(); // RF
+      else stepRF();
 
       clockEl.textContent = new Date().toLocaleTimeString();
     }
